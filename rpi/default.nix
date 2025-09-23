@@ -1,4 +1,4 @@
-{ pinned, core-overlay, libcamera-overlay }:
+{ pinned, core-overlay, libcamera-overlay, rpi-firmware-src }:
 { lib, pkgs, config, ... }:
 
 let
@@ -7,6 +7,23 @@ let
   board = cfg.board;
   kernel = config.system.build.kernel;
   initrd = "${config.system.build.initialRamdisk}/${config.system.boot.loader.initrdFile}";
+
+  # Build the default firmware to be used for our RPI image.
+  # This can be overridden by the caller to provide a custom firmware set,
+  # such as including specific DTO's and DTB's
+  defaultFirmware = pinned.stdenv.mkDerivation {
+    name = "default-rpi-firmware";
+
+    src = "${pkgs.raspberrypifw.overrideAttrs (oldfw: { src = rpi-firmware-src; })}";
+
+    buildPhase = ''
+      # The RPI firmware stores its results in share/raspberrypi for some reason, so we
+      # just copy it out
+
+      mkdir -p $out
+      cp -r $src/share/raspberrypi/boot $out
+    '';
+  };
 in
 {
   imports = [ ./config.nix ./i2c.nix ];
@@ -26,6 +43,13 @@ in
           without the _defconfig part.
         '';
       };
+
+      firmwareDerivation = mkOption {
+        type = types.package;
+        default = defaultFirmware;
+        description = ''Firmware derivation to use.  Defaults to github:raspberrypi/firmware/1.20241008'';
+      };
+
       firmware-partition-label = mkOption {
         default = "FIRMWARE";
         type = types.str;
@@ -121,7 +145,7 @@ in
                 TMPFILE="$TARGET_FIRMWARE_DIR/tmp"
                 KERNEL="${kernel}/${config.system.boot.loader.kernelFile}"
                 SHOULD_UBOOT=${if cfg.uboot.enable then "1" else "0"}
-                SRC_FIRMWARE_DIR="${pkgs.raspberrypifw}/share/raspberrypi/boot"
+                SRC_FIRMWARE_DIR="${cfg.firmwareDerivation}/boot"
                 STARTFILES=("$SRC_FIRMWARE_DIR"/start*.elf)
                 DTBS=("$SRC_FIRMWARE_DIR"/*.dtb)
                 BOOTCODE="$SRC_FIRMWARE_DIR/bootcode.bin"
@@ -195,7 +219,7 @@ in
                     mv -T "$TMPFILE" "$TARGET_OVERLAYS_DIR/$(basename "$SRC")"
                   done
                   echo "${
-                    builtins.toString pkgs.raspberrypifw
+                    builtins.toString cfg.firmwareDerivation
                   }" > "$STATE_DIRECTORY/firmware-version"
                   rm "$STATE_DIRECTORY/firmware-migration-in-progress"
                 }
@@ -227,7 +251,7 @@ in
                 fi
 
                 if [[ -f "$STATE_DIRECTORY/firmware-migration-in-progress" || ! -f "$STATE_DIRECTORY/firmware-version" || $(< "$STATE_DIRECTORY/firmware-version") != ${
-                  builtins.toString pkgs.raspberrypifw
+                  builtins.toString cfg.firmwareDerivation
                 } ]]; then
                   migrate_firmware
                 fi
@@ -349,6 +373,9 @@ in
           "reset-raspberrypi" # required for vl805 firmware to load
         ];
       };
+      # !!! I don't feel this is correct; the user should pass the kernel and configuration
+      # !!! that they want, as opposed to it being forced here.  Any pre-made kernels should
+      # !!! be available for use, but this shouldn't be thrown into the module here
       kernelPackages = pkgs.linuxPackagesFor pkgs.rpi-kernels."${version}"."${board}";
       loader = {
         grub.enable = lib.mkDefault false;

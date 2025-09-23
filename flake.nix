@@ -56,36 +56,38 @@
       nixosModules = {
         raspberry-pi = import ./rpi {
           inherit pinned;
+          inherit (srcs) rpi-firmware-src;
           core-overlay = self.overlays.core;
           libcamera-overlay = self.overlays.libcamera;
         };
         sd-image = import ./sd-image;
       };
-      nixosConfigurations = {
-        rpi-example = srcs.nixpkgs.lib.nixosSystem {
-          system = "aarch64-linux";
-          modules = [ self.nixosModules.raspberry-pi self.nixosModules.sd-image ./example ];
-        };
-      };
-      checks.aarch64-linux = self.packages.aarch64-linux;
-      packages.aarch64-linux = with pinned.lib;
-        let
-          kernels =
-            foldlAttrs f { } pinned.rpi-kernels;
-          f = acc: kernel-version: board-attr-set:
-            foldlAttrs
-              (acc: board-version: drv: acc // {
-                "linux-${kernel-version}-${board-version}" = drv;
-              })
-              acc
-              board-attr-set;
-        in
-        {
-          example-sd-image = self.nixosConfigurations.rpi-example.config.system.build.sdImage;
-          firmware = pinned.raspberrypifw;
-          libcamera = pinned.libcamera;
-          wireless-firmware = pinned.raspberrypiWirelessFirmware;
-          uboot-rpi-arm64 = pinned.uboot-rpi-arm64;
-        } // kernels;
+      # !!! Uncommented temporarily to test our OS configuration
+      # nixosConfigurations = {
+      #   rpi-example = srcs.nixpkgs.lib.nixosSystem {
+      #     system = "aarch64-linux";
+      #     modules = [ self.nixosModules.raspberry-pi self.nixosModules.sd-image ./example ];
+      #   };
+      # };
+      # checks.aarch64-linux = self.packages.aarch64-linux;
+      # packages.aarch64-linux = with pinned.lib;
+      #   let
+      #     kernels =
+      #       foldlAttrs f { } pinned.rpi-kernels;
+      #     f = acc: kernel-version: board-attr-set:
+      #       foldlAttrs
+      #         (acc: board-version: drv: acc // {
+      #           "linux-${kernel-version}-${board-version}" = drv;
+      #         })
+      #         acc
+      #         board-attr-set;
+      #   in
+      #   {
+      #     example-sd-image = self.nixosConfigurations.rpi-example.config.system.build.sdImage;
+      #     firmware = pinned.raspberrypifw;
+      #     libcamera = pinned.libcamera;
+      #     wireless-firmware = pinned.raspberrypiWirelessFirmware;
+      #     uboot-rpi-arm64 = pinned.uboot-rpi-arm64;
+      #   } // kernels;
     };
 }

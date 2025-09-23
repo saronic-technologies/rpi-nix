@@ -28,8 +28,6 @@
           '';
         };
         cfg = config.raspberry-pi-nix;
-        version = cfg.kernel-version;
-        board = cfg.board;
         kernel = "${config.system.build.kernel}/${config.system.boot.loader.kernelFile}";
         initrd = "${config.system.build.initialRamdisk}/${config.system.boot.loader.initrdFile}";
         populate-kernel =
@@ -46,7 +44,7 @@
       {
         populateFirmwareCommands = ''
           ${populate-kernel}
-          cp -r ${pkgs.raspberrypifw}/share/raspberrypi/boot/{start*.elf,*.dtb,bootcode.bin,fixup*.dat,overlays} firmware
+          cp -r ${cfg.firmwareDerivation}/boot/{start*.elf,*.dtb,bootcode.bin,fixup*.dat,overlays} firmware
           cp ${config.hardware.raspberry-pi.config-output} firmware/config.txt
         '';
         populateRootCommands =
