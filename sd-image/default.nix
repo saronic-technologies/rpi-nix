@@ -54,13 +54,15 @@
             ${config.boot.loader.generic-extlinux-compatible.populateCmd} -c ${config.system.build.toplevel} -d ./files/boot
           ''
           else ''
-            mkdir -p ./files/sbin
-            content="$(
-              echo "#!${pkgs.bash}/bin/bash"
-              echo "exec ${config.system.build.toplevel}/init"
-            )"
-            echo "$content" > ./files/sbin/init
-            chmod 744 ./files/sbin/init
+            # !!! Not sure the point of this, as the nix stage2 /init is just executed
+            # !!! behind a script wrapper
+            # mkdir -p ./files/sbin
+            # content="$(
+            #   echo "#!${pkgs.bash}/bin/bash"
+            #   echo "exec ${config.system.build.toplevel}/init"
+            # )"
+            # echo "$content" > ./files/sbin/init
+            # chmod 744 ./files/sbin/init
           '';
       };
   };
