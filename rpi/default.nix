@@ -362,7 +362,9 @@ in
             "console=serial0,115200n8"
           ] else [ ]
           )
-          [ "init=/sbin/init" ]
+            # We install the init script onto our root partition, so we need to tell the
+            # Nix stage 1 to look here for the stage 2
+            [ "init=/sbin/init" ]
         ];
       initrd = {
         availableKernelModules = [
