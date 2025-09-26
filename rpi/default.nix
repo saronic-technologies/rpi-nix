@@ -44,6 +44,14 @@ in
         '';
       };
 
+      firmwareKernelFilename = mkOption {
+        type = types.string;
+        default = "kernel.img";
+        description = ''
+          Filename of the kernel image in the RPI firmware
+        '';
+      };
+
       firmwareDerivation = mkOption {
         type = types.package;
         default = defaultFirmware;
