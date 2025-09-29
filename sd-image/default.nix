@@ -57,7 +57,7 @@
         firmwareCopyCommands = 
           [
             # Copy all the Broadcom-specific files to the firmware directory
-            "cp -r ${cfg.firmwareDerivation}/boot/{start*.elf,bootcode.bin,*.dtb,fixup*.dat,overlays} firmware"
+            "cp -r ${cfg.firmwareDerivation}/boot/{start*.elf,*.bin,*.dtb,fixup*.dat,overlays} firmware"
             # Copy our RPI bootloader config.txt file to the firmware directory
             "cp ${config.hardware.raspberry-pi.config-output} firmware/config.txt"
           ];
