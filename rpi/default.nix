@@ -9,7 +9,8 @@ let
   initrd = "${config.system.build.initialRamdisk}/${config.system.boot.loader.initrdFile}";
 
   # Build the default firmware to be used for our RPI image.
-  # This can be overridden by the caller to provide a custom firmware set,
+  # We set our "firmwareDerivation" parameter to this, but
+  # it can be overridden by the caller to provide a custom firmware set,
   # such as including specific DTO's and DTB's
   defaultFirmware = pinned.stdenv.mkDerivation {
     name = "default-rpi-firmware";
@@ -121,11 +122,33 @@ in
           '';
         };
       };
+      extra-udev-rules = {
+        enable = mkOption {
+          default = true;
+          type = types.bool;
+          description = ''
+            Whether we need the extra udev rules for the RPI.
+          '';
+        };
+      };
+      use-ramdisk = {
+        enable = mkOption {
+          default = true;
+          type = types.bool;
+          description = ''
+            whether we want to use a ramdisk.  if we compile all our modules straight into
+            our kernel, we don't require it.
+          '';
+        };
+      };
     };
   };
 
   config = {
     systemd.services = {
+      # !!! I don't understand the point of this: once we switch our Nix toplevel, the new kernel will
+      # !!! also be copied over to the boot partition, but only AFTER we boot into the toplevel, which
+      # !!! is incorrect.  I'll need to look at this further to see how it's done with the uboot activation
       "raspberry-pi-firmware-migrate" =
         {
           description = "update the firmware partition";
@@ -179,7 +202,7 @@ in
                   echo "migrating kernel"
                   touch "$STATE_DIRECTORY/kernel-migration-in-progress"
                   cp "$KERNEL" "$TMPFILE"
-                  mv -T "$TMPFILE" "$TARGET_FIRMWARE_DIR/kernel.img"
+                  mv -T "$TMPFILE" "$TARGET_FIRMWARE_DIR/${config.raspberry-pi-nix.firmwareKernelFilename}"
                   cp "${initrd}" "$TMPFILE"
                   mv -T "$TMPFILE" "$TARGET_FIRMWARE_DIR/initrd"
                   echo "${
@@ -290,7 +313,7 @@ in
       all = {
         options = {
           # The firmware will start our u-boot binary rather than a
-          # linux kernel.
+          # linux kernel if we have uboot enabled.
           kernel = {
             enable = true;
             value = if cfg.uboot.enable then "u-boot-rpi-arm64.bin" else "kernel.img";
@@ -370,9 +393,6 @@ in
             "console=serial0,115200n8"
           ] else [ ]
           )
-            # We install the init script onto our root partition, so we need to tell the
-            # Nix stage 1 to look here for the stage 2
-            [ "init=/sbin/init" ]
         ];
       initrd = {
         availableKernelModules = [
@@ -403,7 +423,8 @@ in
     users.groups = builtins.listToAttrs (map (k: { name = k; value = { }; })
       [ "input" "sudo" "plugdev" "games" "netdev" "gpio" "i2c" "spi" ]);
     services = {
-      udev.extraRules =
+      # Only provide the extra rules if we configure it
+      udev.extraRules = if cfg.extra-udev-rules.enable then
         let shell = "${pkgs.bash}/bin/bash";
         in ''
           # https://raw.githubusercontent.com/RPi-Distro/raspberrypi-sys-mods/master/etc.armhf/udev/rules.d/99-com.rules
@@ -448,7 +469,8 @@ in
           		echo 0 > /sys$devpath/bind; \
           	fi; \
           '"
-        '';
+        ''
+        else '''';
     };
   };
 

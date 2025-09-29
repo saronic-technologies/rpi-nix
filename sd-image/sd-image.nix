@@ -25,7 +25,7 @@ let
   rootfsImage = pkgs.callPackage "${modulesPath}/../lib/make-ext4-fs.nix" ({
     inherit (config.sdImage) storePaths;
     compressImage = true;
-    populateImageCommands = config.sdImage.populateRootCommands;
+    populateImageCommands = config.sdImage.populateRootPartitionCommands;
     volumeLabel = "NIXOS_SD";
   } // optionalAttrs (config.sdImage.rootPartitionUUID != null) {
     uuid = config.sdImage.rootPartitionUUID;
@@ -101,7 +101,7 @@ in
       '';
     };
 
-    populateFirmwareCommands = mkOption {
+    populateBootPartitionCommands = mkOption {
       example =
         literalExpression "'' cp \${pkgs.myBootLoader}/u-boot.bin firmware/ ''";
       description = ''
@@ -111,7 +111,7 @@ in
       '';
     };
 
-    populateRootCommands = mkOption {
+    populateRootPartitionCommands = mkOption {
       example = literalExpression
         "''\${config.boot.loader.generic-extlinux-compatible.populateCmd} -c \${config.system.build.toplevel} -d ./files/boot''";
       description = ''
@@ -223,7 +223,7 @@ in
 
             # Populate the files intended for /boot/firmware
             mkdir firmware
-            ${config.sdImage.populateFirmwareCommands}
+            ${config.sdImage.populateBootPartitionCommands}
 
             # Copy the populated /boot/firmware into the SD image
             (cd firmware; mcopy -psvm -i ../firmware_part.img ./* ::)

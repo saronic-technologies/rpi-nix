@@ -21,6 +21,9 @@
       "rootfstype=ext4"
       "fsck.repair=yes"
       "rootwait"
+      # Our sd-image creates the /sbin/init binary in our root partition, so we tell the kernel
+      # that's the file we want to boot when it's time to initialize officially
+      "init=/sbin/init"
     ];
 
     sdImage =
@@ -34,24 +37,35 @@
         cfg = config.raspberry-pi-nix;
         kernel = "${config.system.build.kernel}/${config.system.boot.loader.kernelFile}";
         initrd = "${config.system.build.initialRamdisk}/${config.system.boot.loader.initrdFile}";
-        populate-kernel =
-          if cfg.uboot.enable
-          then ''
-            cp ${cfg.uboot.package}/u-boot.bin firmware/u-boot-rpi-arm64.bin
-          ''
-          else ''
-            cp "${kernel}" firmware/${cfg.firmwareKernelFilename}
-            cp "${initrd}" firmware/initrd
-            cp "${kernel-params}" firmware/cmdline.txt
-          '';
+        # Create our copy commands array based on our parameters
+        kernelCopyCommands = [] ++
+          (if cfg.uboot.enable then
+             ["cp ${cfg.uboot.package}/u-boot.bin firmware/u-boot-rpi-arm64.bin"]
+           else []) ++ 
+          # We sometimes use custom kernels that have the needed drivers to mount the rootfs
+          # compiled into it, so we can skip the ramdisk if needed
+          (if cfg.use-ramdisk.enable then
+             [''cp "${initrd}" firmware/initrd'']
+           else []
+          ) ++ 
+          [
+            # Copy our kernel over
+            ''cp "${kernel}" firmware/${cfg.firmwareKernelFilename}''
+            ''cp "${kernel-params}" firmware/cmdline.txt''
+          ];
+
+        firmwareCopyCommands = 
+          [
+            # Copy all the Broadcom-specific files to the firmware directory
+            "cp -r ${cfg.firmwareDerivation}/boot/{start*.elf,bootcode.bin,*.dtb,fixup*.dat,overlays} firmware"
+            # Copy our RPI bootloader config.txt file to the firmware directory
+            "cp ${config.hardware.raspberry-pi.config-output} firmware/config.txt"
+          ];
       in
       {
-        populateFirmwareCommands = ''
-          ${populate-kernel}
-          cp -r ${cfg.firmwareDerivation}/boot/{start*.elf,*.dtb,bootcode.bin,fixup*.dat,overlays} firmware
-          cp ${config.hardware.raspberry-pi.config-output} firmware/config.txt
-        '';
-        populateRootCommands =
+        # Concatenate our kernel copy and our firmware copy commands as our firmware commands
+        populateBootPartitionCommands = pkgs.lib.concatStringsSep "\n" (kernelCopyCommands ++ firmwareCopyCommands);
+        populateRootPartitionCommands =
           if cfg.uboot.enable
           then ''
             mkdir -p ./files/boot
