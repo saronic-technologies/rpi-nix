@@ -45,12 +45,21 @@ in
         '';
       };
 
-      firmwareKernelFilename = mkOption {
+      kernelFilename = mkOption {
         type = types.string;
         default = "kernel.img";
         description = ''
-          Filename of the kernel image in the RPI firmware
+          Filename of the kernel image in the boot partition.
         '';
+      };
+
+      # !!! We need to do this in the RPI config, as the config needs this filename
+      # !!! as one of its parameters.  We are just hard-injecting it for now in our
+      # !!! pre-rendered config for the RevPi
+      ramdiskFilename = mkOption {
+        type = types.string;
+        default = "initrd";
+        description = "Filename of the initrd in the boot partition.";
       };
 
       firmwareDerivation = mkOption {
@@ -122,7 +131,7 @@ in
           '';
         };
       };
-      extra-udev-rules = {
+      extraUDEVRules = {
         enable = mkOption {
           default = true;
           type = types.bool;
@@ -131,7 +140,7 @@ in
           '';
         };
       };
-      use-ramdisk = {
+      useRamdisk = {
         enable = mkOption {
           default = true;
           type = types.bool;
@@ -173,6 +182,7 @@ in
 
                 TARGET_FIRMWARE_DIR="${firmware-path}"
                 TARGET_OVERLAYS_DIR="$TARGET_FIRMWARE_DIR/overlays"
+                SHOULD_USE_RAMDISK = ${if cfg.useRamdisk then "1" else "0"}
                 TMPFILE="$TARGET_FIRMWARE_DIR/tmp"
                 KERNEL="${kernel}/${config.system.boot.loader.kernelFile}"
                 SHOULD_UBOOT=${if cfg.uboot.enable then "1" else "0"}
@@ -202,9 +212,12 @@ in
                   echo "migrating kernel"
                   touch "$STATE_DIRECTORY/kernel-migration-in-progress"
                   cp "$KERNEL" "$TMPFILE"
-                  mv -T "$TMPFILE" "$TARGET_FIRMWARE_DIR/${config.raspberry-pi-nix.firmwareKernelFilename}"
-                  cp "${initrd}" "$TMPFILE"
-                  mv -T "$TMPFILE" "$TARGET_FIRMWARE_DIR/initrd"
+                  mv -T "$TMPFILE" "$TARGET_FIRMWARE_DIR/${cfg.kernelFilename}"
+                  # Migrate our ramdisk over if we are using it
+                  if [[ "$SHOULD_USE_RAMDISK" -eq "1" ]]; then
+                    cp "${initrd}" "$TMPFILE"
+                    mv -T "$TMPFILE" "$TARGET_FIRMWARE_DIR/${cfg.ramdiskFilename}"
+                  fi
                   echo "${
                     builtins.toString kernel
                   }" > "$STATE_DIRECTORY/kernel-version"
@@ -424,7 +437,7 @@ in
       [ "input" "sudo" "plugdev" "games" "netdev" "gpio" "i2c" "spi" ]);
     services = {
       # Only provide the extra rules if we configure it
-      udev.extraRules = if cfg.extra-udev-rules.enable then
+      udev.extraRules = if cfg.extraUDEVRules.enable then
         let shell = "${pkgs.bash}/bin/bash";
         in ''
           # https://raw.githubusercontent.com/RPi-Distro/raspberrypi-sys-mods/master/etc.armhf/udev/rules.d/99-com.rules

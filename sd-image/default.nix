@@ -44,13 +44,13 @@
            else []) ++ 
           # We sometimes use custom kernels that have the needed drivers to mount the rootfs
           # compiled into it, so we can skip the ramdisk if needed
-          (if cfg.use-ramdisk.enable then
-             [''cp "${initrd}" firmware/initrd'']
+          (if cfg.useRamdisk.enable then
+             [''cp "${initrd}" firmware/${cfg.ramdiskFilename}'']
            else []
           ) ++ 
           [
             # Copy our kernel over
-            ''cp "${kernel}" firmware/${cfg.firmwareKernelFilename}''
+            ''cp "${kernel}" firmware/${cfg.kernelFilename}''
             ''cp "${kernel-params}" firmware/cmdline.txt''
           ];
 
