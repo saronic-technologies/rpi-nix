@@ -329,7 +329,7 @@ in
           # linux kernel if we have uboot enabled.
           kernel = {
             enable = true;
-            value = if cfg.uboot.enable then "u-boot-rpi-arm64.bin" else "kernel.img";
+            value = if cfg.uboot.enable then "u-boot-rpi-arm64.bin" else cfg.kernelFilename;
           };
           ramfsfile = {
             enable = !cfg.uboot.enable;
