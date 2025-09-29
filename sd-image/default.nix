@@ -36,7 +36,11 @@
         };
         cfg = config.raspberry-pi-nix;
         kernel = "${config.system.build.kernel}/${config.system.boot.loader.kernelFile}";
-        initrd = "${config.system.build.initialRamdisk}/${config.system.boot.loader.initrdFile}";
+
+        initrd = if cfg.useRamdisk then 
+          "${config.system.build.initialRamdisk}/${config.system.boot.loader.initrdFile}"
+        else "";
+
         # Create our copy commands array based on our parameters
         kernelCopyCommands = [] ++
           (if cfg.uboot.enable then
@@ -45,7 +49,7 @@
           # We sometimes use custom kernels that have the needed drivers to mount the rootfs
           # compiled into it, so we can skip the ramdisk if needed
           (if cfg.useRamdisk.enable then
-             [''cp "${initrd}" firmware/${cfg.ramdiskFilename}'']
+             [''cp ${initrd} firmware/${cfg.ramdiskFilename}'']
            else []
           ) ++ 
           [

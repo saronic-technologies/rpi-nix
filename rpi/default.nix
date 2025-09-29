@@ -6,7 +6,6 @@ let
   version = cfg.kernel-version;
   board = cfg.board;
   kernel = config.system.build.kernel;
-  initrd = "${config.system.build.initialRamdisk}/${config.system.boot.loader.initrdFile}";
 
   # Build the default firmware to be used for our RPI image.
   # We set our "firmwareDerivation" parameter to this, but
@@ -183,6 +182,7 @@ in
                 TARGET_FIRMWARE_DIR="${firmware-path}"
                 TARGET_OVERLAYS_DIR="$TARGET_FIRMWARE_DIR/overlays"
                 SHOULD_USE_RAMDISK = ${if cfg.useRamdisk.enable then "1" else "0"}
+                RAMDISK_PATH = ${if cfg.useRamdisk.enable then "${config.system.build.initialRamdisk}/${config.system.boot.loader.initrdFile}" else ""}
                 TMPFILE="$TARGET_FIRMWARE_DIR/tmp"
                 KERNEL="${kernel}/${config.system.boot.loader.kernelFile}"
                 SHOULD_UBOOT=${if cfg.uboot.enable then "1" else "0"}
@@ -215,7 +215,7 @@ in
                   mv -T "$TMPFILE" "$TARGET_FIRMWARE_DIR/${cfg.kernelFilename}"
                   # Migrate our ramdisk over if we are using it
                   if [[ "$SHOULD_USE_RAMDISK" -eq "1" ]]; then
-                    cp "${initrd}" "$TMPFILE"
+                    cp "$RAMDISK_PATH" "$TMPFILE"
                     mv -T "$TMPFILE" "$TARGET_FIRMWARE_DIR/${cfg.ramdiskFilename}"
                   fi
                   echo "${
@@ -407,7 +407,7 @@ in
           ] else [ ]
           )
         ];
-      initrd = {
+      initrd = if cfg.useRamdisk.enable then {
         availableKernelModules = [
           "usbhid"
           "usb_storage"
@@ -415,7 +415,7 @@ in
           "pcie_brcmstb" # required for the pcie bus to work
           "reset-raspberrypi" # required for vl805 firmware to load
         ];
-      };
+      } else { includeDefaultModules = false; availableKernelModules = []; kernelModules = []; };
       # !!! I don't feel this is correct; the user should pass the kernel and configuration
       # !!! that they want, as opposed to it being forced here.  Any pre-made kernels should
       # !!! be available for use, but this shouldn't be thrown into the module here
