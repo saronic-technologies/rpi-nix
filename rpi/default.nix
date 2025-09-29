@@ -182,7 +182,7 @@ in
 
                 TARGET_FIRMWARE_DIR="${firmware-path}"
                 TARGET_OVERLAYS_DIR="$TARGET_FIRMWARE_DIR/overlays"
-                SHOULD_USE_RAMDISK = ${if cfg.useRamdisk then "1" else "0"}
+                SHOULD_USE_RAMDISK = ${if cfg.useRamdisk.enable then "1" else "0"}
                 TMPFILE="$TARGET_FIRMWARE_DIR/tmp"
                 KERNEL="${kernel}/${config.system.boot.loader.kernelFile}"
                 SHOULD_UBOOT=${if cfg.uboot.enable then "1" else "0"}
