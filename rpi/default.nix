@@ -400,8 +400,11 @@ in
       kernelParams =
         if cfg.uboot.enable then [ ]
         else builtins.concatLists [
-          [ "console=tty1" ]
+          # If we have a console, we have to make sure to declare tty1 first to avoid it overriding
+          # the console we declare.  If we declare tty1 after our actual console, then we will never get
+          # messages over the serial connection
           (if cfg.serial-console.enable then [
+            "console=tty1"
             # https://github.com/raspberrypi/firmware/issues/1539#issuecomment-784498108
             "console=serial0,115200n8"
           ] else [ ]
