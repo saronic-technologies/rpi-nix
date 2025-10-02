@@ -248,7 +248,9 @@ in
         # Figure out device names for the boot device and root filesystem.
         rootPart=$(${pkgs.util-linux}/bin/findmnt -n -o SOURCE /)
         bootDevice=$(lsblk -npo PKNAME $rootPart)
-        partNum=$(lsblk -npo PARTN $rootPart)
+        # lsblk sometimes puts spaces in front of our partition number, which will break
+        # sfdisk, so we make sure to trim them
+        partNum=$(lsblk -npo PARTN $rootPart | tr -d ' ')
 
         # Resize the root partition and the filesystem to fit the disk
         echo ",+," | sfdisk -N$partNum --no-reread $bootDevice
