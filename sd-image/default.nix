@@ -1,7 +1,7 @@
 { config, lib, pkgs, ... }:
 
 {
-  imports = [ ./sd-image.nix ];
+  imports = [ ./sd-image.nix ./bootloader/install-rpi-bootloader.nix ];
 
   config = {
     boot.loader.grub.enable = false;
@@ -28,47 +28,49 @@
 
     sdImage =
       let
-        kernel-params = pkgs.writeTextFile {
-          name = "cmdline.txt";
-          text = ''
-            ${lib.strings.concatStringsSep " " config.boot.kernelParams}
-          '';
-        };
         cfg = config.raspberry-pi-nix;
-        kernel = "${config.system.build.kernel}/${config.system.boot.loader.kernelFile}";
+        copyCommands = pkgs.callPackage ./bootloader/commands.nix { inherit config; output_directory = "firmware"; };
+          # kernel-params = pkgs.writeTextFile {
+          #   name = "cmdline.txt";
+          #   text = ''
+          #     ${lib.strings.concatStringsSep " " config.boot.kernelParams}
+          #   '';
+          # };
+          # cfg = config.raspberry-pi-nix;
+          # kernel = "${config.system.build.kernel}/${config.system.boot.loader.kernelFile}";
 
-        initrd = if cfg.useRamdisk then 
-          "${config.system.build.initialRamdisk}/${config.system.boot.loader.initrdFile}"
-        else "";
+          # initrd = if cfg.useRamdisk then 
+          #   "${config.system.build.initialRamdisk}/${config.system.boot.loader.initrdFile}"
+          # else "";
 
-        # Create our copy commands array based on our parameters
-        kernelCopyCommands = [] ++
-          (if cfg.uboot.enable then
-             ["cp ${cfg.uboot.package}/u-boot.bin firmware/u-boot-rpi-arm64.bin"]
-           else []) ++ 
-          # We sometimes use custom kernels that have the needed drivers to mount the rootfs
-          # compiled into it, so we can skip the ramdisk if needed
-          (if cfg.useRamdisk.enable then
-             [''cp ${initrd} firmware/${cfg.ramdiskFilename}'']
-           else []
-          ) ++ 
-          [
-            # Copy our kernel over
-            ''cp "${kernel}" firmware/${cfg.kernelFilename}''
-            ''cp "${kernel-params}" firmware/cmdline.txt''
-          ];
+          # # Create our copy commands array based on our parameters
+          # kernelCopyCommands = [] ++
+          #   (if cfg.uboot.enable then
+          #      ["cp ${cfg.uboot.package}/u-boot.bin firmware/u-boot-rpi-arm64.bin"]
+          #    else []) ++ 
+          #   # We sometimes use custom kernels that have the needed drivers to mount the rootfs
+          #   # compiled into it, so we can skip the ramdisk if needed
+          #   (if cfg.useRamdisk.enable then
+          #      [''cp ${initrd} firmware/${cfg.ramdiskFilename}'']
+          #    else []
+          #   ) ++ 
+          #   [
+          #     # Copy our kernel over
+          #     ''cp "${kernel}" firmware/${cfg.kernelFilename}''
+          #     ''cp "${kernel-params}" firmware/cmdline.txt''
+          #   ];
 
-        firmwareCopyCommands = 
-          [
-            # Copy all the Broadcom-specific files to the firmware directory
-            "cp -r ${cfg.firmwareDerivation}/boot/{start*.elf,*.bin,*.dtb,fixup*.dat,overlays} firmware"
-            # Copy our RPI bootloader config.txt file to the firmware directory
-            "cp ${config.hardware.raspberry-pi.config-output} firmware/config.txt"
-          ];
+          # firmwareCopyCommands = 
+          #   [
+          #     # Copy all the Broadcom-specific files to the firmware directory
+          #     "cp -r ${cfg.firmwareDerivation}/boot/{start*.elf,*.bin,*.dtb,fixup*.dat,overlays} firmware"
+          #     # Copy our RPI bootloader config.txt file to the firmware directory
+          #     "cp ${config.hardware.raspberry-pi.config-output} firmware/config.txt"
+          #   ];
       in
       {
         # Concatenate our kernel copy and our firmware copy commands as our firmware commands
-        populateBootPartitionCommands = pkgs.lib.concatStringsSep "\n" (kernelCopyCommands ++ firmwareCopyCommands);
+        populateBootPartitionCommands = pkgs.lib.concatStringsSep "\n" (copyCommands.kernelCopyCommands ++ copyCommands.firmwareCopyCommands);
         populateRootPartitionCommands =
           if cfg.uboot.enable
           then ''

@@ -241,24 +241,38 @@ in
       { };
 
     boot.postBootCommands = lib.mkIf config.sdImage.expandOnBoot ''
+      log() {
+        local msg="$*"
+        if [ -c "/dev/kmsg ]; then
+          printf '%s\n' "$msg" >/dev/kmsg
+        else
+          printf '%s\n' "$msg" >/dev/console
+        fi
+      }
+
       # On the first boot do some maintenance tasks
       if [ -f /nix-path-registration ]; then
         set -euo pipefail
         set -x
+
         # Figure out device names for the boot device and root filesystem.
         rootPart=$(${pkgs.util-linux}/bin/findmnt -n -o SOURCE /)
-        echo "Root part: $rootPart" > /dev/kmsg
+        log "Root part: $rootPart"
+
         bootDevice=$(lsblk -npo PKNAME $rootPart)
-        echo "Boot device: $bootDevice" > /dev/kmsg
+        log "Boot device: $bootDevice"
+
         # lsblk sometimes puts spaces in front of our partition number, which will break
         # sfdisk, so we make sure to trim them
         partNum=$(lsblk -npo MAJ:MIN $rootPart | ${pkgs.gawk}/bin/awk -F: '{print $2}')
-        echo "Part Num: $partNum" > /dev/kmsg
+        log "Part Num: $partNum"
 
         # Resize the root partition and the filesystem to fit the disk
         echo ",+," | sfdisk -N$partNum --no-reread $bootDevice
         ${pkgs.parted}/bin/partprobe
         ${pkgs.e2fsprogs}/bin/resize2fs $rootPart
+
+        log "Partition $rootPart resize complete"
 
         # Register the contents of the initial Nix store
         ${config.nix.package.out}/bin/nix-store --load-db < /nix-path-registration
@@ -269,7 +283,15 @@ in
 
         # Prevents this from running on later boots.
         rm -f /nix-path-registration
+
+        log "NixOS initialization complete"
       fi
+
+      # Sometimes FSCK dumps its results into our boot partition, which we don't want
+      # as it clutters it up and we want to be conscious of space, so we delete them
+      # when we find them.
+      log "Clearing FSCK results..."
+      rm -rf /boot/firmware/FSCK*.REC
     '';
   };
 }

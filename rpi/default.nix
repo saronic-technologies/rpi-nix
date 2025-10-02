@@ -425,7 +425,14 @@ in
       kernelPackages = pkgs.linuxPackagesFor pkgs.rpi-kernels."${version}"."${board}";
       loader = {
         grub.enable = lib.mkDefault false;
-        initScript.enable = !cfg.uboot.enable;
+        # If we are using uboot, it uses generic-ext-linux, but otherwise we need to
+        # use our custom bootloader.
+        raspberryPi.enable = !cfg.uboot.enable;
+        # If we want to use a script that modifies /sbin/init when we switch
+        # to a configuration.
+        # !!! This script does not modify the kernel/initrd/dtbs/firmware on the boot sector,
+        # !!! so I have no idea why it's an "installBootloader" script
+        initScript.enable = false;# !cfg.uboot.enable;
         generic-extlinux-compatible = {
           enable = lib.mkDefault cfg.uboot.enable;
           # We want to use the device tree provided by firmware, so don't
