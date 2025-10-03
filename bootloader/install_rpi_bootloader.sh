@@ -136,6 +136,6 @@ done
 copyBootloaderFiles
 
 # Replace our /boot/firmware directory with our staging directory
-rm -rf "$BOOT_DIRECTORY/*"
+rm -rf "${BOOT_DIRECTORY:?}/*"
 cp -a "$BOOTLOADER_STAGING_DIRECTORY/." "$BOOT_DIRECTORY/"
 mv "$INIT_STAGING" "$INIT"
