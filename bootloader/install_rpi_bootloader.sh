@@ -100,10 +100,12 @@ addEntry "@DISTRO_NAME@ - Default" "$NEW_CONFIGURATION" ""
 
 # Add all generations of the system profile to the menu, in reverse
 # (most recent to least recent) order.
-for link in $( (ls -d "$NEW_CONFIGURATION/specialisation/*" ) | sort -n); do
-    date=$(stat --printf="%y\n" "$link" | sed 's/\..*//')
-    addEntry "@DISTRO_NAME@ - variation" "$link" ""
-done
+if [ -d "$NEW_CONFIGURATION/specialisation" ]; then
+  for link in $( (ls -d "$NEW_CONFIGURATION/specialisation/*" ) | sort -n); do
+      date=$(stat --printf="%y\n" "$link" | sed 's/\..*//')
+      addEntry "@DISTRO_NAME@ - variation" "$link" ""
+  done
+fi
 
 for generation in $(
     (cd /nix/var/nix/profiles && ls -d system-*-link) \

@@ -39,7 +39,12 @@ in
   firmwareCopyCommands = 
     [
       # Copy all the Broadcom-specific files to the firmware directory
+      # We need to use nullglob here as we want BASH to try to expand the wildcards and not
+      # leave them as-is (*.bin) if they don't exist, so we include the set and disable
+      # here
+      "shopt -s nullglob"
       "cp -r ${cfg.firmwareDerivation}/boot/{start*.elf,*.bin,*.dtb,fixup*.dat,overlays} ${output_directory}"
+      "shopt -u nullglob"
       # Copy our RPI bootloader config.txt file to the firmware directory
       "cp ${nix_config.hardware.raspberry-pi.config-output} ${output_directory}/config.txt"
     ];
