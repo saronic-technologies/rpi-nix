@@ -243,7 +243,7 @@ in
     boot.postBootCommands = lib.mkIf config.sdImage.expandOnBoot ''
       log() {
         local msg="$*"
-        if [ -c "/dev/kmsg ]; then
+        if [ -c "/dev/kmsg" ]; then
           printf '%s\n' "$msg" >/dev/kmsg
         else
           printf '%s\n' "$msg" >/dev/console
