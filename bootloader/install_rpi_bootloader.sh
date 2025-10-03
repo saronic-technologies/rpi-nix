@@ -99,16 +99,23 @@ addEntry "@DISTRO_NAME@ - Default" "$NEW_CONFIGURATION" ""
 
 # Add all generations of the system profile to the menu, in reverse
 # (most recent to least recent) order.
-if [ -d "$NEW_CONFIGURATION/specialisation" ]; then
-  # Set our nullglob here so our wildcard expands or doesn't at all, as opposed
-  # to BASH trying to look for a file called "*"
-  shopt -s nullglob
-  for link in $( (ls -d "$NEW_CONFIGURATION/specialisation/*" ) | sort -n); do
-      date=$(stat --printf="%y\n" "$link" | sed 's/\..*//')
-      addEntry "@DISTRO_NAME@ - variation" "$link" ""
-  done
-  # Disable nullglob here
-  shopt -u nullglob
+shopt -s nullglob
+
+dir="$NEW_CONFIGURATION/specialisation"
+
+# Expand the glob into an array *after* enabling nullglob
+files=( "$dir"/* )
+
+shopt -u nullglob
+
+# Sort safely (NUL-delimited) and iterate
+if ((${#files[@]})); then
+  printf '%s\0' "${files[@]}" \
+    | sort -z -n \
+    | while IFS= read -r -d '' link; do
+        date=$(stat --printf='%y\n' -- "$link" | sed 's/\..*//')
+        addEntry "@DISTRO_NAME@ - variation" "$link" ""
+      done
 fi
 
 for generation in $(
