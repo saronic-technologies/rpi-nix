@@ -32,13 +32,12 @@ OTHER_PATHS="$BOOT_DIRECTORY/$OTHER_PATHS_FILENAME"
 addEntry() {
     local name="$1"
     local path="$2"
-    local shortSuffix="$3"
 
     # Path to our Nix configuration's init script, which is the
     # Nix stage 2 loader
     local stage2="$path/init"
 
-    local entryTitle="$name - $shortSuffix"
+    local entryTitle="$name"
     local stage2Call="exec $stage2"
     local bootloaderCopyCommands=""
 
@@ -76,7 +75,7 @@ addEntry() {
       )"
       echo "$initScript" > "$INIT_STAGING"
       echo "# older configurations: $OTHER_PATHS" >> "$INIT_STAGING"
-      chmod +x "$INIT_STAGING"
+      chmod 744 "$INIT_STAGING"
     fi
 
     # Append our content to our "other" file, for reference
@@ -101,10 +100,15 @@ addEntry "@DISTRO_NAME@ - Default" "$NEW_CONFIGURATION" ""
 # Add all generations of the system profile to the menu, in reverse
 # (most recent to least recent) order.
 if [ -d "$NEW_CONFIGURATION/specialisation" ]; then
+  # Set our nullglob here so our wildcard expands or doesn't at all, as opposed
+  # to BASH trying to look for a file called "*"
+  shopt -s nullglob
   for link in $( (ls -d "$NEW_CONFIGURATION/specialisation/*" ) | sort -n); do
       date=$(stat --printf="%y\n" "$link" | sed 's/\..*//')
       addEntry "@DISTRO_NAME@ - variation" "$link" ""
   done
+  # Disable nullglob here
+  shopt -u nullglob
 fi
 
 for generation in $(
@@ -131,6 +135,6 @@ done
 # !!! files are all stored with each configuration, so we don't have a risk of losing them
 copyBootloaderFiles
 
-# Replace our boot directory
-mv "$BOOTLOADER_STAGING_DIRECTORY" "$BOOT_DIRECTORY"
+# Replace our /boot/firmware directory with our staging directory
+mv -T "$BOOTLOADER_STAGING_DIRECTORY" "$BOOT_DIRECTORY"
 mv "$INIT_STAGING" "$INIT"
