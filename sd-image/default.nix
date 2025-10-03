@@ -1,7 +1,7 @@
 { config, lib, pkgs, ... }:
 
 {
-  imports = [ ./sd-image.nix ./bootloader/install-rpi-bootloader.nix ];
+  imports = [ ./sd-image.nix  ];
 
   config = {
     boot.loader.grub.enable = false;
@@ -29,7 +29,11 @@
     sdImage =
       let
         cfg = config.raspberry-pi-nix;
-        copyCommands = pkgs.callPackage ./bootloader/commands.nix { inherit config; output_directory = "firmware"; };
+        # Create our copy commands using our shared code
+        copyCommands = pkgs.callPackage ../bootloader/commands.nix {
+          nix_config = config;
+          output_directory = "firmware";
+        };
           # kernel-params = pkgs.writeTextFile {
           #   name = "cmdline.txt";
           #   text = ''

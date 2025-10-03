@@ -7,22 +7,27 @@
 
 { pkgs, lib, config, ... }:
 let
-  output_directory = "tmp_firmware";
-  bootloaderCopyCommands = lib.concatStringsSep
-    "\n"
-    (pkgs.callPackage ./commands.nix { inherit output_directory; nix_config = config; });
+  output_directory = "\"$BOOTLOADER_STAGING_DIRECTORY\"";
+  copyCommands = pkgs.callPackage ./commands.nix { inherit output_directory; nix_config = config; };
+  bootloaderCopyCommands = lib.concatStringsSep "\n"
+    (copyCommands.kernelCopyCommands ++ copyCommands.firmwareCopyCommands);
 
   template = builtins.readFile ./install_rpi_bootloader.sh;
-  # Replace the placeholder with our generated checks
   script_content = builtins.replaceStrings
-    [ "@BOOTLOADER_COPY_COMMANDS@" ]
-    [ bootloaderCopyCommands ]
+    [
+      "@BOOTLOADER_COPY_COMMANDS@"
+      "@DISTRO_NAME@"
+    ]
+    [
+      bootloaderCopyCommands
+      "Saronic RevPi NixOS"
+    ]
     template;
 in 
   with lib;
   {
     options = {
-      boot.loader.raspberryPi = {
+      boot.loader.rpi = {
         enable = mkOption {
           default = false;
           type = types.bool;
@@ -34,12 +39,15 @@ in
       };
     };
 
-    config = {
-      system.build.installBootLoader = mkIf config.boot.loader.raspberryPi.enable
-        pkgs.writeShellApplication {
+    config = mkIf config.boot.loader.rpi.enable {
+      system.build.installBootLoader =
+      let
+        installRPIBootloader = pkgs.writeShellApplication {
           name = "install-rpi-bootloader";
           text = script_content;
           runtimeInputs = [ pkgs.openssh ];
         };
+      in 
+        "${installRPIBootloader}/bin/install-rpi-bootloader";
     };
   }

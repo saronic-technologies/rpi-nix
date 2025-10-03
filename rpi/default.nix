@@ -26,7 +26,9 @@ let
   };
 in
 {
-  imports = [ ./config.nix ./i2c.nix ];
+  # Include the bootloader so we can set the "rpi" option for our installBootloader
+  # parameter
+  imports = [ ./config.nix ./i2c.nix ../bootloader ];
 
   options = with lib; {
     raspberry-pi-nix = {
@@ -427,7 +429,7 @@ in
         grub.enable = lib.mkDefault false;
         # If we are using uboot, it uses generic-ext-linux, but otherwise we need to
         # use our custom bootloader.
-        raspberryPi.enable = !cfg.uboot.enable;
+        rpi.enable = !cfg.uboot.enable;
         # If we want to use a script that modifies /sbin/init when we switch
         # to a configuration.
         # !!! This script does not modify the kernel/initrd/dtbs/firmware on the boot sector,

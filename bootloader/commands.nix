@@ -1,6 +1,8 @@
 # This file generates the commands needed to fill an RPI bootloader.
 # It involves copying the kernel, ramdisk (if required), Broadcom firmware,
 # dtb's, overlays, config.txt, and cmdline.txt
+# It uses the current nix configuration to get the parameters of the system being
+# built to generate the commands for that system.
 
 { pkgs, lib, nix_config, output_directory }:
 let
@@ -13,7 +15,7 @@ let
   cfg = nix_config.raspberry-pi-nix;
   kernel = "${nix_config.system.build.kernel}/${nix_config.system.boot.loader.kernelFile}";
   
-  initrd = if cfg.useRamdisk then 
+  initrd = if cfg.useRamdisk.enable then 
     "${nix_config.system.build.initialRamdisk}/${nix_config.system.boot.loader.initrdFile}"
   else "";
 in
