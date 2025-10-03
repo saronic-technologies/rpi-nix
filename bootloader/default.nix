@@ -7,20 +7,34 @@
 
 { pkgs, lib, config, ... }:
 let
+  # Our output directory is a BASH variable that is filled in when the script
+  # is executed
   output_directory = "\"$BOOTLOADER_STAGING_DIRECTORY\"";
+
+  # Create our copy commands
+
+  # We can use our toplevel config to generate the commands, as our config contains our firmwareDerivation
+  # as well as the standard kernel/initrd, alongside our generators for cmdline.txt and config.txt, which are
+  # RPI-specific
   copyCommands = pkgs.callPackage ./commands.nix { inherit output_directory; nix_config = config; };
   bootloaderCopyCommands = lib.concatStringsSep "\n"
     (copyCommands.kernelCopyCommands ++ copyCommands.firmwareCopyCommands);
 
+  # Build our templace, replacing the required strings
   template = builtins.readFile ./install_rpi_bootloader.sh;
   script_content = builtins.replaceStrings
     [
       "@BOOTLOADER_COPY_COMMANDS@"
       "@DISTRO_NAME@"
+      "@BOOTLOADER_COPY_COMMANDS_START@"
+      "@BOOTLOADER_COPY_COMMANDS_END@"
     ]
     [
       bootloaderCopyCommands
-      "Saronic RevPi NixOS"
+      # Use our NixOS distro name
+      config.system.nixos.distroName
+      "### BOOTLOADER COPY COMMANDS START ###"
+      "### BOOTLOADER COPY COMMANDS END ###"
     ]
     template;
 in 
@@ -45,7 +59,7 @@ in
         installRPIBootloader = pkgs.writeShellApplication {
           name = "install-rpi-bootloader";
           text = script_content;
-          runtimeInputs = [ pkgs.openssh ];
+          runtimeInputs = [ pkgs.openssh pkgs.gawk ];
         };
       in 
         "${installRPIBootloader}/bin/install-rpi-bootloader";

@@ -68,7 +68,6 @@ in
         default = defaultFirmware;
         description = ''Firmware derivation to use.  Defaults to github:raspberrypi/firmware/1.20241008'';
       };
-
       firmware-partition-label = mkOption {
         default = "FIRMWARE";
         type = types.str;
@@ -83,15 +82,15 @@ in
           '';
         };
       };
-      firmware-migration-service = {
-        enable = mkOption {
-          default = true;
-          type = types.bool;
-          description = ''
-            Whether to run the migration service automatically or not.
-          '';
-        };
-      };
+        # firmware-migration-service = {
+        #   enable = mkOption {
+        #     default = true;
+        #     type = types.bool;
+        #     description = ''
+        #       Whether to run the migration service automatically or not.
+        #     '';
+        #   };
+        # };
       libcamera-overlay = {
         enable = mkOption {
           default = true;
@@ -155,156 +154,156 @@ in
   };
 
   config = {
-    systemd.services = {
-      # !!! I don't understand the point of this: once we switch our Nix toplevel, the new kernel will
-      # !!! also be copied over to the boot partition, but only AFTER we boot into the toplevel, which
-      # !!! is incorrect.  I'll need to look at this further to see how it's done with the uboot activation
-      "raspberry-pi-firmware-migrate" =
-        {
-          description = "update the firmware partition";
-          wantedBy = if cfg.firmware-migration-service.enable then [ "multi-user.target" ] else [ ];
-          serviceConfig =
-            let
-              firmware-path = "/boot/firmware";
-              kernel-params = pkgs.writeTextFile {
-                name = "cmdline.txt";
-                text = ''
-                  ${lib.strings.concatStringsSep " " config.boot.kernelParams}
-                '';
-              };
-            in
-            {
-              Type = "oneshot";
-              MountImages =
-                "/dev/disk/by-label/${cfg.firmware-partition-label}:${firmware-path}";
-              StateDirectory = "raspberrypi-firmware";
-              ExecStart = pkgs.writeShellScript "migrate-rpi-firmware" ''
-                shopt -s nullglob
-
-                TARGET_FIRMWARE_DIR="${firmware-path}"
-                TARGET_OVERLAYS_DIR="$TARGET_FIRMWARE_DIR/overlays"
-                SHOULD_USE_RAMDISK = ${if cfg.useRamdisk.enable then "1" else "0"}
-                RAMDISK_PATH = ${if cfg.useRamdisk.enable then "${config.system.build.initialRamdisk}/${config.system.boot.loader.initrdFile}" else ""}
-                TMPFILE="$TARGET_FIRMWARE_DIR/tmp"
-                KERNEL="${kernel}/${config.system.boot.loader.kernelFile}"
-                SHOULD_UBOOT=${if cfg.uboot.enable then "1" else "0"}
-                SRC_FIRMWARE_DIR="${cfg.firmwareDerivation}/boot"
-                STARTFILES=("$SRC_FIRMWARE_DIR"/start*.elf)
-                DTBS=("$SRC_FIRMWARE_DIR"/*.dtb)
-                BOOTCODE="$SRC_FIRMWARE_DIR/bootcode.bin"
-                FIXUPS=("$SRC_FIRMWARE_DIR"/fixup*.dat)
-                SRC_OVERLAYS_DIR="$SRC_FIRMWARE_DIR/overlays"
-                SRC_OVERLAYS=("$SRC_OVERLAYS_DIR"/*)
-                CONFIG="${config.hardware.raspberry-pi.config-output}"
-
-                ${lib.strings.optionalString cfg.uboot.enable ''
-                  UBOOT="${cfg.uboot.package}/u-boot.bin"
-
-                  migrate_uboot() {
-                    echo "migrating uboot"
-                    touch "$STATE_DIRECTORY/uboot-migration-in-progress"
-                    cp "$UBOOT" "$TMPFILE"
-                    mv -T "$TMPFILE" "$TARGET_FIRMWARE_DIR/u-boot-rpi-arm64.bin"
-                    echo "${builtins.toString cfg.uboot.package}" > "$STATE_DIRECTORY/uboot-version"
-                    rm "$STATE_DIRECTORY/uboot-migration-in-progress"
-                  }
-                ''}
-
-                migrate_kernel() {
-                  echo "migrating kernel"
-                  touch "$STATE_DIRECTORY/kernel-migration-in-progress"
-                  cp "$KERNEL" "$TMPFILE"
-                  mv -T "$TMPFILE" "$TARGET_FIRMWARE_DIR/${cfg.kernelFilename}"
-                  # Migrate our ramdisk over if we are using it
-                  if [[ "$SHOULD_USE_RAMDISK" -eq "1" ]]; then
-                    cp "$RAMDISK_PATH" "$TMPFILE"
-                    mv -T "$TMPFILE" "$TARGET_FIRMWARE_DIR/${cfg.ramdiskFilename}"
-                  fi
-                  echo "${
-                    builtins.toString kernel
-                  }" > "$STATE_DIRECTORY/kernel-version"
-                  rm "$STATE_DIRECTORY/kernel-migration-in-progress"
-                }
-
-                migrate_cmdline() {
-                  echo "migrating cmdline"
-                  touch "$STATE_DIRECTORY/cmdline-migration-in-progress"
-                  cp "${kernel-params}" "$TMPFILE"
-                  mv -T "$TMPFILE" "$TARGET_FIRMWARE_DIR/cmdline.txt"
-                  echo "${
-                    builtins.toString kernel-params
-                  }" > "$STATE_DIRECTORY/cmdline-version"
-                  rm "$STATE_DIRECTORY/cmdline-migration-in-progress"
-                }
-
-                migrate_config() {
-                  echo "migrating config.txt"
-                  touch "$STATE_DIRECTORY/config-migration-in-progress"
-                  cp "$CONFIG" "$TMPFILE"
-                  mv -T "$TMPFILE" "$TARGET_FIRMWARE_DIR/config.txt"
-                  echo "${config.hardware.raspberry-pi.config-output}" > "$STATE_DIRECTORY/config-version"
-                  rm "$STATE_DIRECTORY/config-migration-in-progress"
-                }
-
-                migrate_firmware() {
-                  echo "migrating raspberrypi firmware"
-                  touch "$STATE_DIRECTORY/firmware-migration-in-progress"
-                  for SRC in "''${STARTFILES[@]}" "''${DTBS[@]}" "$BOOTCODE" "''${FIXUPS[@]}"
-                  do
-                    cp "$SRC" "$TMPFILE"
-                    mv -T "$TMPFILE" "$TARGET_FIRMWARE_DIR/$(basename "$SRC")"
-                  done
-
-                  if [[ ! -d "$TARGET_OVERLAYS_DIR" ]]; then
-                    mkdir "$TARGET_OVERLAYS_DIR"
-                  fi
-
-                  for SRC in "''${SRC_OVERLAYS[@]}"
-                  do
-                    cp "$SRC" "$TMPFILE"
-                    mv -T "$TMPFILE" "$TARGET_OVERLAYS_DIR/$(basename "$SRC")"
-                  done
-                  echo "${
-                    builtins.toString cfg.firmwareDerivation
-                  }" > "$STATE_DIRECTORY/firmware-version"
-                  rm "$STATE_DIRECTORY/firmware-migration-in-progress"
-                }
-
-                ${lib.strings.optionalString cfg.uboot.enable ''
-                  if [[ "$SHOULD_UBOOT" -eq 1 ]] && [[ -f "$STATE_DIRECTORY/uboot-migration-in-progress" || ! -f "$STATE_DIRECTORY/uboot-version" || $(< "$STATE_DIRECTORY/uboot-version") != ${
-                    builtins.toString cfg.uboot.package
-                  } ]]; then
-                    migrate_uboot
-                  fi
-                ''}
-
-                if [[ "$SHOULD_UBOOT" -ne 1 ]] && [[ ! -f "$STATE_DIRECTORY/kernel-version" || $(< "$STATE_DIRECTORY/kernel-version") != ${
-                  builtins.toString kernel
-                } ]]; then
-                  migrate_kernel
-                fi
-
-                if [[ "$SHOULD_UBOOT" -ne 1 ]] && [[ ! -f "$STATE_DIRECTORY/cmdline-version" || $(< "$STATE_DIRECTORY/cmdline-version") != ${
-                  builtins.toString kernel-params
-                } ]]; then
-                  migrate_cmdline
-                fi
-
-                if [[ -f "$STATE_DIRECTORY/config-migration-in-progress" || ! -f "$STATE_DIRECTORY/config-version" || $(< "$STATE_DIRECTORY/config-version") != ${
-                  builtins.toString config.hardware.raspberry-pi.config-output
-                } ]]; then
-                  migrate_config
-                fi
-
-                if [[ -f "$STATE_DIRECTORY/firmware-migration-in-progress" || ! -f "$STATE_DIRECTORY/firmware-version" || $(< "$STATE_DIRECTORY/firmware-version") != ${
-                  builtins.toString cfg.firmwareDerivation
-                } ]]; then
-                  migrate_firmware
-                fi
-              '';
-            };
-        };
-    };
+    #     systemd.services = {
+    #       # !!! I don't understand the point of this: once we switch our Nix toplevel, the new kernel will
+    #       # !!! also be copied over to the boot partition, but only AFTER we boot into the toplevel, which
+    #       # !!! is incorrect.  I'll need to look at this further to see how it's done with the uboot activation
+    #       "raspberry-pi-firmware-migrate" =
+    #         {
+    #           description = "update the firmware partition";
+    #           wantedBy = if cfg.firmware-migration-service.enable then [ "multi-user.target" ] else [ ];
+    #           serviceConfig =
+    #             let
+    #               firmware-path = "/boot/firmware";
+    #               kernel-params = pkgs.writeTextFile {
+    #                 name = "cmdline.txt";
+    #                 text = ''
+    #                   ${lib.strings.concatStringsSep " " config.boot.kernelParams}
+    #                 '';
+    #               };
+    #             in
+    #             {
+    #               Type = "oneshot";
+    #               MountImages =
+    #                 "/dev/disk/by-label/${cfg.firmware-partition-label}:${firmware-path}";
+    #               StateDirectory = "raspberrypi-firmware";
+    #               ExecStart = pkgs.writeShellScript "migrate-rpi-firmware" ''
+    #                 shopt -s nullglob
+    # 
+    #                 TARGET_FIRMWARE_DIR="${firmware-path}"
+    #                 TARGET_OVERLAYS_DIR="$TARGET_FIRMWARE_DIR/overlays"
+    #                 SHOULD_USE_RAMDISK = ${if cfg.useRamdisk.enable then "1" else "0"}
+    #                 RAMDISK_PATH = ${if cfg.useRamdisk.enable then "${config.system.build.initialRamdisk}/${config.system.boot.loader.initrdFile}" else ""}
+    #                 TMPFILE="$TARGET_FIRMWARE_DIR/tmp"
+    #                 KERNEL="${kernel}/${config.system.boot.loader.kernelFile}"
+    #                 SHOULD_UBOOT=${if cfg.uboot.enable then "1" else "0"}
+    #                 SRC_FIRMWARE_DIR="${cfg.firmwareDerivation}/boot"
+    #                 STARTFILES=("$SRC_FIRMWARE_DIR"/start*.elf)
+    #                 DTBS=("$SRC_FIRMWARE_DIR"/*.dtb)
+    #                 BOOTCODE="$SRC_FIRMWARE_DIR/bootcode.bin"
+    #                 FIXUPS=("$SRC_FIRMWARE_DIR"/fixup*.dat)
+    #                 SRC_OVERLAYS_DIR="$SRC_FIRMWARE_DIR/overlays"
+    #                 SRC_OVERLAYS=("$SRC_OVERLAYS_DIR"/*)
+    #                 CONFIG="${config.hardware.raspberry-pi.config-output}"
+    # 
+    #                 ${lib.strings.optionalString cfg.uboot.enable ''
+    #                   UBOOT="${cfg.uboot.package}/u-boot.bin"
+    # 
+    #                   migrate_uboot() {
+    #                     echo "migrating uboot"
+    #                     touch "$STATE_DIRECTORY/uboot-migration-in-progress"
+    #                     cp "$UBOOT" "$TMPFILE"
+    #                     mv -T "$TMPFILE" "$TARGET_FIRMWARE_DIR/u-boot-rpi-arm64.bin"
+    #                     echo "${builtins.toString cfg.uboot.package}" > "$STATE_DIRECTORY/uboot-version"
+    #                     rm "$STATE_DIRECTORY/uboot-migration-in-progress"
+    #                   }
+    #                 ''}
+    # 
+    #                 migrate_kernel() {
+    #                   echo "migrating kernel"
+    #                   touch "$STATE_DIRECTORY/kernel-migration-in-progress"
+    #                   cp "$KERNEL" "$TMPFILE"
+    #                   mv -T "$TMPFILE" "$TARGET_FIRMWARE_DIR/${cfg.kernelFilename}"
+    #                   # Migrate our ramdisk over if we are using it
+    #                   if [[ "$SHOULD_USE_RAMDISK" -eq "1" ]]; then
+    #                     cp "$RAMDISK_PATH" "$TMPFILE"
+    #                     mv -T "$TMPFILE" "$TARGET_FIRMWARE_DIR/${cfg.ramdiskFilename}"
+    #                   fi
+    #                   echo "${
+    #                     builtins.toString kernel
+    #                   }" > "$STATE_DIRECTORY/kernel-version"
+    #                   rm "$STATE_DIRECTORY/kernel-migration-in-progress"
+    #                 }
+    # 
+    #                 migrate_cmdline() {
+    #                   echo "migrating cmdline"
+    #                   touch "$STATE_DIRECTORY/cmdline-migration-in-progress"
+    #                   cp "${kernel-params}" "$TMPFILE"
+    #                   mv -T "$TMPFILE" "$TARGET_FIRMWARE_DIR/cmdline.txt"
+    #                   echo "${
+    #                     builtins.toString kernel-params
+    #                   }" > "$STATE_DIRECTORY/cmdline-version"
+    #                   rm "$STATE_DIRECTORY/cmdline-migration-in-progress"
+    #                 }
+    # 
+    #                 migrate_config() {
+    #                   echo "migrating config.txt"
+    #                   touch "$STATE_DIRECTORY/config-migration-in-progress"
+    #                   cp "$CONFIG" "$TMPFILE"
+    #                   mv -T "$TMPFILE" "$TARGET_FIRMWARE_DIR/config.txt"
+    #                   echo "${config.hardware.raspberry-pi.config-output}" > "$STATE_DIRECTORY/config-version"
+    #                   rm "$STATE_DIRECTORY/config-migration-in-progress"
+    #                 }
+    # 
+    #                 migrate_firmware() {
+    #                   echo "migrating raspberrypi firmware"
+    #                   touch "$STATE_DIRECTORY/firmware-migration-in-progress"
+    #                   for SRC in "''${STARTFILES[@]}" "''${DTBS[@]}" "$BOOTCODE" "''${FIXUPS[@]}"
+    #                   do
+    #                     cp "$SRC" "$TMPFILE"
+    #                     mv -T "$TMPFILE" "$TARGET_FIRMWARE_DIR/$(basename "$SRC")"
+    #                   done
+    # 
+    #                   if [[ ! -d "$TARGET_OVERLAYS_DIR" ]]; then
+    #                     mkdir "$TARGET_OVERLAYS_DIR"
+    #                   fi
+    # 
+    #                   for SRC in "''${SRC_OVERLAYS[@]}"
+    #                   do
+    #                     cp "$SRC" "$TMPFILE"
+    #                     mv -T "$TMPFILE" "$TARGET_OVERLAYS_DIR/$(basename "$SRC")"
+    #                   done
+    #                   echo "${
+    #                     builtins.toString cfg.firmwareDerivation
+    #                   }" > "$STATE_DIRECTORY/firmware-version"
+    #                   rm "$STATE_DIRECTORY/firmware-migration-in-progress"
+    #                 }
+    # 
+    #                 ${lib.strings.optionalString cfg.uboot.enable ''
+    #                   if [[ "$SHOULD_UBOOT" -eq 1 ]] && [[ -f "$STATE_DIRECTORY/uboot-migration-in-progress" || ! -f "$STATE_DIRECTORY/uboot-version" || $(< "$STATE_DIRECTORY/uboot-version") != ${
+    #                     builtins.toString cfg.uboot.package
+    #                   } ]]; then
+    #                     migrate_uboot
+    #                   fi
+    #                 ''}
+    # 
+    #                 if [[ "$SHOULD_UBOOT" -ne 1 ]] && [[ ! -f "$STATE_DIRECTORY/kernel-version" || $(< "$STATE_DIRECTORY/kernel-version") != ${
+    #                   builtins.toString kernel
+    #                 } ]]; then
+    #                   migrate_kernel
+    #                 fi
+    # 
+    #                 if [[ "$SHOULD_UBOOT" -ne 1 ]] && [[ ! -f "$STATE_DIRECTORY/cmdline-version" || $(< "$STATE_DIRECTORY/cmdline-version") != ${
+    #                   builtins.toString kernel-params
+    #                 } ]]; then
+    #                   migrate_cmdline
+    #                 fi
+    # 
+    #                 if [[ -f "$STATE_DIRECTORY/config-migration-in-progress" || ! -f "$STATE_DIRECTORY/config-version" || $(< "$STATE_DIRECTORY/config-version") != ${
+    #                   builtins.toString config.hardware.raspberry-pi.config-output
+    #                 } ]]; then
+    #                   migrate_config
+    #                 fi
+    # 
+    #                 if [[ -f "$STATE_DIRECTORY/firmware-migration-in-progress" || ! -f "$STATE_DIRECTORY/firmware-version" || $(< "$STATE_DIRECTORY/firmware-version") != ${
+    #                   builtins.toString cfg.firmwareDerivation
+    #                 } ]]; then
+    #                   migrate_firmware
+    #                 fi
+    #               '';
+    #             };
+    #         };
+    #     };
 
     # Default config.txt on Raspberry Pi OS:
     # https://github.com/RPi-Distro/pi-gen/blob/master/stage1/00-boot-files/files/config.txt
@@ -436,6 +435,8 @@ in
         # !!! so I have no idea why it's an "installBootloader" script
         initScript.enable = false;# !cfg.uboot.enable;
         generic-extlinux-compatible = {
+          # extlinux puts all our information into a configuration file that is read when
+          # extlinux is called by uboot
           enable = lib.mkDefault cfg.uboot.enable;
           # We want to use the device tree provided by firmware, so don't
           # add FDTDIR to the extlinux conf file.
