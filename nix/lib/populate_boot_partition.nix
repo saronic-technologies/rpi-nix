@@ -23,7 +23,7 @@
           ''cp "${kernelParamsFile}" ${output_directory}/cmdline.txt''
           # We sometimes use custom kernels that have the needed drivers to mount the rootfs
           # compiled into it, so we can skip the ramdisk if needed
-          (if config.boot.loader.rpi.useRamdisk.enable then
+          (if config.boot.loader.rpi.useRamdisk then
              ''cp "${config.system.build.initialRamdisk}/${config.system.boot.loader.initrdFile}" ${output_directory}/${config.boot.loader.rpi.ramdiskFilename}''
           else '''')
         ]) ++
