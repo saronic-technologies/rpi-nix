@@ -29,6 +29,8 @@ in
     # to populate the firmware directory and the rootfs image
     sdImage = {
       populateFirmwareCommands = bootPartitionHelpers.mkPopulateRPIBootPartitionCommands { inherit config pkgs; };
+      # We have extra elements in our boot partition, namely more overlays, so we increase the firmwareSize a bit
+      firmwareSize = 128;
       compressImage = true;
       # rootVolumeLabel = "NIXOS_SD";
       # Concatenate our kernel copy and our firmware copy commands as our firmware commands
