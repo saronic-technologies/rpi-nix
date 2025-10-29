@@ -13,8 +13,6 @@ let
     '';
   };
   cfg = nix_config.raspberry-pi-nix;
-in
-{
   # Create our copy commands array based on our parameters
   kernelCopyCommands = [] ++
     # Copy either our kernel image over or our uboot image over, depending on what's enabled
@@ -48,4 +46,6 @@ in
       # Copy our RPI bootloader config.txt file to the firmware directory
       "cp ${nix_config.hardware.raspberry-pi.config-output} ${output_directory}/config.txt"
     ];
+in
+{
 }

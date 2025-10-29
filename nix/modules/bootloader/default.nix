@@ -5,12 +5,10 @@
 
 # We can re-use the firmware/kernel copy commands from the SD card builder here
 
-{ rpi-firmware-src, ... }:
-{ pkgs, lib, config, modulesPath, ... }:
+{ rpi-firmware-src, ... }@inputs:
+{ pkgs, lib, config, ... }:
 let
-  cfg = config.rpi-nix;
-  output_directory = "firmware";
-
+  # Default RPI firmware incase it's not specified
   defaultFirmware = pkgs.stdenv.mkDerivation {
     name = "default-rpi-firmware";
 
@@ -25,53 +23,10 @@ let
       cp -r $src/share/raspberrypi/boot $out
     '';
   };
-
-  kernelParamsFile = pkgs.writeTextFile {
-    name = "cmdline.txt";
-    text = ''
-      ${lib.strings.concatStringsSep " " config.boot.kernelParams}
-    '';
-  };
-
-  kernelCopyCommands = 
-    # Copy either our kernel image over or our uboot image over, depending on what's enabled
-    # If uboot is enabled, then extlinux is enabled as well, which handles copying our initrd
-    # and kernel and cmdline.txt
-    (if config.boot.loader.rpi-uboot.enable then
-       ["cp ${config.boot.loader.rpi-uboot.package}/u-boot.bin ${output_directory}/${cfg.rpi-partition.kernelFilename}"]
-     else [
-       # Copy our kernel over
-       ''cp "${config.system.build.kernel}/${config.system.boot.loader.kernelFile}" ${output_directory}/${cfg.rpi-partition.kernelFilename}''
-       # Copy our kernel parameters over
-       ''cp "${kernelParamsFile}" ${output_directory}/cmdline.txt''
-       # We sometimes use custom kernels that have the needed drivers to mount the rootfs
-       # compiled into it, so we can skip the ramdisk if needed
-       (if config.boot.loader.rpi.useRamdisk.enable then
-          ''cp "${config.system.build.initialRamdisk}/${config.system.boot.loader.initrdFile}" ${output_directory}/${config.boot.loader.rpi.ramdiskFilename}''
-       else '''')
-     ]);
-  
-  # Regardless of uboot or not, we have to copy these over as
-  # they are the RPI first and second stage bootloader files 
-  firmwareCopyCommands = 
-    [
-      # Copy all the Broadcom-specific files to the firmware directory
-      # We need to use nullglob here as we want BASH to try to expand the wildcards and not
-      # leave them as-is (*.bin) if they don't exist, so we include the set and disable
-      # here
-      "shopt -s nullglob"
-      "cp -r ${cfg.rpi-partition.firmware}/boot/{start*.elf,*.bin,*.dtb,fixup*.dat,overlays} ${output_directory}"
-      "shopt -u nullglob"
-      # Copy our RPI bootloader config.txt file to the firmware directory
-      "cp ${cfg.rpi-partition.configFile} ${output_directory}/config.txt"
-    ];
+  bootPartitionHelpers = import ../../lib/populate_boot_partition.nix inputs;
 in 
   with lib;
   {
-    imports = [ 
-      "${toString modulesPath}/installer/sd-card/sd-image.nix"
-    ];
-    
     options = {
       # Partition-specific parameters for the RPI device, independent of the actual third-stage
       # bootloader
@@ -174,21 +129,6 @@ in
           };
         };
         consoleLogLevel = lib.mkDefault 7;
-        kernelParams = [
-          # This is ugly and fragile, but the sdImage image has an msdos
-          # table, so the partition table id is a 1-indexed hex
-          # number. So, we drop the hex prefix and stick on a "02" to
-          # refer to the root partition.
-        
-          # This is the root partition; Linux uses this to figure out which partition
-          # to use as the rootfs partition
-          "root=PARTUUID=${lib.strings.removePrefix "0x" config.sdImage.firmwarePartitionID}-02"
-          "rootfstype=ext4"
-          "fsck.repair=yes"
-          "rootwait"
-          # Our sd-image creates the /sbin/init binary in our root partition, so we tell the kernel
-          # that's the file we want to boot when it's time to initialize officially
-        ] ++ (if config.boot.loader.rpi-uboot.enable then [] else ["init=/sbin/init"]);
       };
 
       # If we are using the RPI bootloader, then modify our installBootLoader script to our
@@ -205,7 +145,7 @@ in
               "@BOOTLOADER_COPY_COMMANDS_END@"
             ]
             [
-              config.sdImage.populateFirmwareCommands
+              bootPartitionHelpers.mkPopulateRPIBootPartitionCommands { inherit config pkgs; }
               # Use our NixOS distro name
               config.system.nixos.distroName
               "### BOOTLOADER COPY COMMANDS START ###"
@@ -222,30 +162,5 @@ in
           "${installRPIBootloader}/bin/install-rpi-bootloader"
       );
 
-      # Modify the Nix-specific sdImage parameters to match what we have for RPI, specifically our commands  
-      # to populate the firmware directory and the rootfs image
-      sdImage = {
-        populateFirmwareCommands = pkgs.lib.concatStringsSep "\n" (kernelCopyCommands ++ firmwareCopyCommands);
-        compressImage = true;
-        rootVolumeLabel = "NIXOS_SD";
-        # Concatenate our kernel copy and our firmware copy commands as our firmware commands
-        populateImageCommands =
-          if config.boot.loader.rpi-uboot.enable
-          then ''
-            mkdir -p ./files/boot
-            ${config.boot.loader.generic-extlinux-compatible.populateCmd} -c ${config.system.build.toplevel} -d ./files/boot
-          ''
-          else ''
-            mkdir -p ./files/sbin
-            # Write a script that executes the Nix stage 2, as we know its
-            # exact path in the toplevel that we have configured
-            content="$(
-              echo "#!${pkgs.bash}/bin/bash"
-              echo "exec ${config.system.build.toplevel}/init"
-            )"
-            echo "$content" > ./files/sbin/init
-            chmod 744 ./files/sbin/init
-          '';
-      };
     };
   }

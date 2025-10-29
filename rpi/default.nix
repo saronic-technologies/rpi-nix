@@ -3,27 +3,13 @@
 
 let
   cfg = config.raspberry-pi-nix;
-  version = cfg.kernel-version;
-  board = cfg.board;
-  kernel = config.system.build.kernel;
+  # version = cfg.kernel-version;
+  # board = cfg.board;
 
   # Build the default firmware to be used for our RPI image.
   # We set our "firmwareDerivation" parameter to this, but
   # it can be overridden by the caller to provide a custom firmware set,
   # such as including specific DTO's and DTB's
-  defaultFirmware = pinned.stdenv.mkDerivation {
-    name = "default-rpi-firmware";
-
-    src = "${pkgs.raspberrypifw.overrideAttrs (oldfw: { src = rpi-firmware-src; })}";
-
-    buildPhase = ''
-      # The RPI firmware stores its results in share/raspberrypi for some reason, so we
-      # just copy it out
-
-      mkdir -p $out
-      cp -r $src/share/raspberrypi/boot $out
-    '';
-  };
 in
 {
   # Include the bootloader so we can set the "rpi" option for our installBootloader
@@ -32,27 +18,27 @@ in
 
   options = with lib; {
     raspberry-pi-nix = {
-      kernel-version = mkOption {
-        default = "v6_6_51";
-        type = types.str;
-        description = "Kernel version to build.";
-      };
-      board = mkOption {
-        type = types.enum [ "bcm2711" "bcm2712" ];
-        description = ''
-          The kernel board version to build.
-          Examples at: https://www.raspberrypi.com/documentation/computers/linux_kernel.html#native-build-configuration
-          without the _defconfig part.
-        '';
-      };
+        # kernel-version = mkOption {
+        #   default = "v6_6_51";
+        #   type = types.str;
+        #   description = "Kernel version to build.";
+        # };
+        # board = mkOption {
+        #   type = types.enum [ "bcm2711" "bcm2712" ];
+        #   description = ''
+        #     The kernel board version to build.
+        #     Examples at: https://www.raspberrypi.com/documentation/computers/linux_kernel.html#native-build-configuration
+        #     without the _defconfig part.
+        #   '';
+        # };
 
-      kernelFilename = mkOption {
-        type = types.string;
-        default = "kernel.img";
-        description = ''
-          Filename of the kernel image in the boot partition.
-        '';
-      };
+        # kernelFilename = mkOption {
+        #   type = types.string;
+        #   default = "kernel.img";
+        #   description = ''
+        #     Filename of the kernel image in the boot partition.
+        #   '';
+        # };
 
       # !!! We need to do this in the RPI config, as the config needs this filename
       # !!! as one of its parameters.  We are just hard-injecting it for now in our
@@ -62,17 +48,16 @@ in
         default = "initrd";
         description = "Filename of the initrd in the boot partition.";
       };
-
-      firmwareDerivation = mkOption {
-        type = types.package;
-        default = defaultFirmware;
-        description = ''Firmware derivation to use.  Defaults to github:raspberrypi/firmware/1.20241008'';
-      };
-      firmware-partition-label = mkOption {
-        default = "FIRMWARE";
-        type = types.str;
-        description = "label of rpi firmware partition";
-      };
+        # firmwareDerivation = mkOption {
+        #   type = types.package;
+        #   default = defaultFirmware;
+        #   description = ''Firmware derivation to use.  Defaults to github:raspberrypi/firmware/1.20241008'';
+        # };
+        # firmware-partition-label = mkOption {
+        #   default = "FIRMWARE";
+        #   type = types.str;
+        #   description = "label of rpi firmware partition";
+        # };
       pin-inputs = {
         enable = mkOption {
           default = true;
@@ -82,15 +67,6 @@ in
           '';
         };
       };
-        # firmware-migration-service = {
-        #   enable = mkOption {
-        #     default = true;
-        #     type = types.bool;
-        #     description = ''
-        #       Whether to run the migration service automatically or not.
-        #     '';
-        #   };
-        # };
       libcamera-overlay = {
         enable = mkOption {
           default = true;
@@ -101,24 +77,24 @@ in
           '';
         };
       };
-      uboot = {
-        enable = mkOption {
-          default = false;
-          type = types.bool;
-          description = ''
-            If enabled then uboot is used as the bootloader. If disabled
-            then the linux kernel is installed directly into the
-            firmware directory as expected by the raspberry pi boot
-            process.
+        # uboot = {
+        #   enable = mkOption {
+        #     default = false;
+        #     type = types.bool;
+        #     description = ''
+        #       If enabled then uboot is used as the bootloader. If disabled
+        #       then the linux kernel is installed directly into the
+        #       firmware directory as expected by the raspberry pi boot
+        #       process.
 
-            This can be useful for newer hardware that doesn't yet have
-            uboot compatibility or less common setups, like booting a
-            cm4 with an nvme drive.
-          '';
-        };
+        #       This can be useful for newer hardware that doesn't yet have
+        #       uboot compatibility or less common setups, like booting a
+        #       cm4 with an nvme drive.
+        #     '';
+        #   };
 
-        package = mkPackageOption pkgs "uboot-rpi-arm64" { };
-      };
+        #   package = mkPackageOption pkgs "uboot-rpi-arm64" { };
+        # };
       serial-console = {
         enable = mkOption {
           default = true;
@@ -140,171 +116,20 @@ in
           '';
         };
       };
-      useRamdisk = {
-        enable = mkOption {
-          default = true;
-          type = types.bool;
-          description = ''
-            whether we want to use a ramdisk.  if we compile all our modules straight into
-            our kernel, we don't require it.
-          '';
-        };
-      };
+        # useRamdisk = {
+        #   enable = mkOption {
+        #     default = true;
+        #     type = types.bool;
+        #     description = ''
+        #       whether we want to use a ramdisk.  if we compile all our modules straight into
+        #       our kernel, we don't require it.
+        #     '';
+        #   };
+        # };
     };
   };
 
   config = {
-    #     systemd.services = {
-    #       # !!! I don't understand the point of this: once we switch our Nix toplevel, the new kernel will
-    #       # !!! also be copied over to the boot partition, but only AFTER we boot into the toplevel, which
-    #       # !!! is incorrect.  I'll need to look at this further to see how it's done with the uboot activation
-    #       "raspberry-pi-firmware-migrate" =
-    #         {
-    #           description = "update the firmware partition";
-    #           wantedBy = if cfg.firmware-migration-service.enable then [ "multi-user.target" ] else [ ];
-    #           serviceConfig =
-    #             let
-    #               firmware-path = "/boot/firmware";
-    #               kernel-params = pkgs.writeTextFile {
-    #                 name = "cmdline.txt";
-    #                 text = ''
-    #                   ${lib.strings.concatStringsSep " " config.boot.kernelParams}
-    #                 '';
-    #               };
-    #             in
-    #             {
-    #               Type = "oneshot";
-    #               MountImages =
-    #                 "/dev/disk/by-label/${cfg.firmware-partition-label}:${firmware-path}";
-    #               StateDirectory = "raspberrypi-firmware";
-    #               ExecStart = pkgs.writeShellScript "migrate-rpi-firmware" ''
-    #                 shopt -s nullglob
-    # 
-    #                 TARGET_FIRMWARE_DIR="${firmware-path}"
-    #                 TARGET_OVERLAYS_DIR="$TARGET_FIRMWARE_DIR/overlays"
-    #                 SHOULD_USE_RAMDISK = ${if cfg.useRamdisk.enable then "1" else "0"}
-    #                 RAMDISK_PATH = ${if cfg.useRamdisk.enable then "${config.system.build.initialRamdisk}/${config.system.boot.loader.initrdFile}" else ""}
-    #                 TMPFILE="$TARGET_FIRMWARE_DIR/tmp"
-    #                 KERNEL="${kernel}/${config.system.boot.loader.kernelFile}"
-    #                 SHOULD_UBOOT=${if cfg.uboot.enable then "1" else "0"}
-    #                 SRC_FIRMWARE_DIR="${cfg.firmwareDerivation}/boot"
-    #                 STARTFILES=("$SRC_FIRMWARE_DIR"/start*.elf)
-    #                 DTBS=("$SRC_FIRMWARE_DIR"/*.dtb)
-    #                 BOOTCODE="$SRC_FIRMWARE_DIR/bootcode.bin"
-    #                 FIXUPS=("$SRC_FIRMWARE_DIR"/fixup*.dat)
-    #                 SRC_OVERLAYS_DIR="$SRC_FIRMWARE_DIR/overlays"
-    #                 SRC_OVERLAYS=("$SRC_OVERLAYS_DIR"/*)
-    #                 CONFIG="${config.hardware.raspberry-pi.config-output}"
-    # 
-    #                 ${lib.strings.optionalString cfg.uboot.enable ''
-    #                   UBOOT="${cfg.uboot.package}/u-boot.bin"
-    # 
-    #                   migrate_uboot() {
-    #                     echo "migrating uboot"
-    #                     touch "$STATE_DIRECTORY/uboot-migration-in-progress"
-    #                     cp "$UBOOT" "$TMPFILE"
-    #                     mv -T "$TMPFILE" "$TARGET_FIRMWARE_DIR/u-boot-rpi-arm64.bin"
-    #                     echo "${builtins.toString cfg.uboot.package}" > "$STATE_DIRECTORY/uboot-version"
-    #                     rm "$STATE_DIRECTORY/uboot-migration-in-progress"
-    #                   }
-    #                 ''}
-    # 
-    #                 migrate_kernel() {
-    #                   echo "migrating kernel"
-    #                   touch "$STATE_DIRECTORY/kernel-migration-in-progress"
-    #                   cp "$KERNEL" "$TMPFILE"
-    #                   mv -T "$TMPFILE" "$TARGET_FIRMWARE_DIR/${cfg.kernelFilename}"
-    #                   # Migrate our ramdisk over if we are using it
-    #                   if [[ "$SHOULD_USE_RAMDISK" -eq "1" ]]; then
-    #                     cp "$RAMDISK_PATH" "$TMPFILE"
-    #                     mv -T "$TMPFILE" "$TARGET_FIRMWARE_DIR/${cfg.ramdiskFilename}"
-    #                   fi
-    #                   echo "${
-    #                     builtins.toString kernel
-    #                   }" > "$STATE_DIRECTORY/kernel-version"
-    #                   rm "$STATE_DIRECTORY/kernel-migration-in-progress"
-    #                 }
-    # 
-    #                 migrate_cmdline() {
-    #                   echo "migrating cmdline"
-    #                   touch "$STATE_DIRECTORY/cmdline-migration-in-progress"
-    #                   cp "${kernel-params}" "$TMPFILE"
-    #                   mv -T "$TMPFILE" "$TARGET_FIRMWARE_DIR/cmdline.txt"
-    #                   echo "${
-    #                     builtins.toString kernel-params
-    #                   }" > "$STATE_DIRECTORY/cmdline-version"
-    #                   rm "$STATE_DIRECTORY/cmdline-migration-in-progress"
-    #                 }
-    # 
-    #                 migrate_config() {
-    #                   echo "migrating config.txt"
-    #                   touch "$STATE_DIRECTORY/config-migration-in-progress"
-    #                   cp "$CONFIG" "$TMPFILE"
-    #                   mv -T "$TMPFILE" "$TARGET_FIRMWARE_DIR/config.txt"
-    #                   echo "${config.hardware.raspberry-pi.config-output}" > "$STATE_DIRECTORY/config-version"
-    #                   rm "$STATE_DIRECTORY/config-migration-in-progress"
-    #                 }
-    # 
-    #                 migrate_firmware() {
-    #                   echo "migrating raspberrypi firmware"
-    #                   touch "$STATE_DIRECTORY/firmware-migration-in-progress"
-    #                   for SRC in "''${STARTFILES[@]}" "''${DTBS[@]}" "$BOOTCODE" "''${FIXUPS[@]}"
-    #                   do
-    #                     cp "$SRC" "$TMPFILE"
-    #                     mv -T "$TMPFILE" "$TARGET_FIRMWARE_DIR/$(basename "$SRC")"
-    #                   done
-    # 
-    #                   if [[ ! -d "$TARGET_OVERLAYS_DIR" ]]; then
-    #                     mkdir "$TARGET_OVERLAYS_DIR"
-    #                   fi
-    # 
-    #                   for SRC in "''${SRC_OVERLAYS[@]}"
-    #                   do
-    #                     cp "$SRC" "$TMPFILE"
-    #                     mv -T "$TMPFILE" "$TARGET_OVERLAYS_DIR/$(basename "$SRC")"
-    #                   done
-    #                   echo "${
-    #                     builtins.toString cfg.firmwareDerivation
-    #                   }" > "$STATE_DIRECTORY/firmware-version"
-    #                   rm "$STATE_DIRECTORY/firmware-migration-in-progress"
-    #                 }
-    # 
-    #                 ${lib.strings.optionalString cfg.uboot.enable ''
-    #                   if [[ "$SHOULD_UBOOT" -eq 1 ]] && [[ -f "$STATE_DIRECTORY/uboot-migration-in-progress" || ! -f "$STATE_DIRECTORY/uboot-version" || $(< "$STATE_DIRECTORY/uboot-version") != ${
-    #                     builtins.toString cfg.uboot.package
-    #                   } ]]; then
-    #                     migrate_uboot
-    #                   fi
-    #                 ''}
-    # 
-    #                 if [[ "$SHOULD_UBOOT" -ne 1 ]] && [[ ! -f "$STATE_DIRECTORY/kernel-version" || $(< "$STATE_DIRECTORY/kernel-version") != ${
-    #                   builtins.toString kernel
-    #                 } ]]; then
-    #                   migrate_kernel
-    #                 fi
-    # 
-    #                 if [[ "$SHOULD_UBOOT" -ne 1 ]] && [[ ! -f "$STATE_DIRECTORY/cmdline-version" || $(< "$STATE_DIRECTORY/cmdline-version") != ${
-    #                   builtins.toString kernel-params
-    #                 } ]]; then
-    #                   migrate_cmdline
-    #                 fi
-    # 
-    #                 if [[ -f "$STATE_DIRECTORY/config-migration-in-progress" || ! -f "$STATE_DIRECTORY/config-version" || $(< "$STATE_DIRECTORY/config-version") != ${
-    #                   builtins.toString config.hardware.raspberry-pi.config-output
-    #                 } ]]; then
-    #                   migrate_config
-    #                 fi
-    # 
-    #                 if [[ -f "$STATE_DIRECTORY/firmware-migration-in-progress" || ! -f "$STATE_DIRECTORY/firmware-version" || $(< "$STATE_DIRECTORY/firmware-version") != ${
-    #                   builtins.toString cfg.firmwareDerivation
-    #                 } ]]; then
-    #                   migrate_firmware
-    #                 fi
-    #               '';
-    #             };
-    #         };
-    #     };
-
     # Default config.txt on Raspberry Pi OS:
     # https://github.com/RPi-Distro/pi-gen/blob/master/stage1/00-boot-files/files/config.txt
     hardware.raspberry-pi.config = {
@@ -423,7 +248,7 @@ in
       # !!! I don't feel this is correct; the user should pass the kernel and configuration
       # !!! that they want, as opposed to it being forced here.  Any pre-made kernels should
       # !!! be available for use, but this shouldn't be thrown into the module here
-      kernelPackages = pkgs.linuxPackagesFor pkgs.rpi-kernels."${version}"."${board}";
+      # kernelPackages = pkgs.linuxPackagesFor pkgs.rpi-kernels."${version}"."${board}";
       loader = {
         grub.enable = lib.mkDefault false;
         # If we are using uboot, it uses generic-ext-linux, but otherwise we need to
@@ -433,71 +258,71 @@ in
         # to a configuration.
         # !!! This script does not modify the kernel/initrd/dtbs/firmware on the boot sector,
         # !!! so I have no idea why it's an "installBootloader" script
-        initScript.enable = false;# !cfg.uboot.enable;
+        initScript.enable = lib.mkDefault false;# !cfg.uboot.enable;
         generic-extlinux-compatible = {
           # extlinux puts all our information into a configuration file that is read when
           # extlinux is called by uboot
           enable = lib.mkDefault cfg.uboot.enable;
           # We want to use the device tree provided by firmware, so don't
           # add FDTDIR to the extlinux conf file.
-          useGenerationDeviceTree = false;
+          useGenerationDeviceTree = lib.mkDefault false;
         };
       };
     };
-    hardware.enableRedistributableFirmware = true;
+    # hardware.enableRedistributableFirmware = true;
 
-    users.groups = builtins.listToAttrs (map (k: { name = k; value = { }; })
-      [ "input" "sudo" "plugdev" "games" "netdev" "gpio" "i2c" "spi" ]);
-    services = {
-      # Only provide the extra rules if we configure it
-      udev.extraRules = if cfg.extraUDEVRules.enable then
-        let shell = "${pkgs.bash}/bin/bash";
-        in ''
-          # https://raw.githubusercontent.com/RPi-Distro/raspberrypi-sys-mods/master/etc.armhf/udev/rules.d/99-com.rules
-          SUBSYSTEM=="input", GROUP="input", MODE="0660"
-          SUBSYSTEM=="i2c-dev", GROUP="i2c", MODE="0660"
-          SUBSYSTEM=="spidev", GROUP="spi", MODE="0660"
-          SUBSYSTEM=="*gpiomem*", GROUP="gpio", MODE="0660"
-          SUBSYSTEM=="rpivid-*", GROUP="video", MODE="0660"
+    # users.groups = builtins.listToAttrs (map (k: { name = k; value = { }; })
+    #   [ "input" "sudo" "plugdev" "games" "netdev" "gpio" "i2c" "spi" ]);
+    # services = {
+    #   # Only provide the extra rules if we configure it
+    #   udev.extraRules = if cfg.extraUDEVRules.enable then
+    #     let shell = "${pkgs.bash}/bin/bash";
+    #     in ''
+    #       # https://raw.githubusercontent.com/RPi-Distro/raspberrypi-sys-mods/master/etc.armhf/udev/rules.d/99-com.rules
+    #       SUBSYSTEM=="input", GROUP="input", MODE="0660"
+    #       SUBSYSTEM=="i2c-dev", GROUP="i2c", MODE="0660"
+    #       SUBSYSTEM=="spidev", GROUP="spi", MODE="0660"
+    #       SUBSYSTEM=="*gpiomem*", GROUP="gpio", MODE="0660"
+    #       SUBSYSTEM=="rpivid-*", GROUP="video", MODE="0660"
 
-          KERNEL=="vcsm-cma", GROUP="video", MODE="0660"
-          SUBSYSTEM=="dma_heap", GROUP="video", MODE="0660"
+    #       KERNEL=="vcsm-cma", GROUP="video", MODE="0660"
+    #       SUBSYSTEM=="dma_heap", GROUP="video", MODE="0660"
 
-          SUBSYSTEM=="gpio", GROUP="gpio", MODE="0660"
-          SUBSYSTEM=="gpio", KERNEL=="gpiochip*", ACTION=="add", PROGRAM="${shell} -c 'chgrp -R gpio /sys/class/gpio && chmod -R g=u /sys/class/gpio'"
-          SUBSYSTEM=="gpio", ACTION=="add", PROGRAM="${shell} -c 'chgrp -R gpio /sys%p && chmod -R g=u /sys%p'"
+    #       SUBSYSTEM=="gpio", GROUP="gpio", MODE="0660"
+    #       SUBSYSTEM=="gpio", KERNEL=="gpiochip*", ACTION=="add", PROGRAM="${shell} -c 'chgrp -R gpio /sys/class/gpio && chmod -R g=u /sys/class/gpio'"
+    #       SUBSYSTEM=="gpio", ACTION=="add", PROGRAM="${shell} -c 'chgrp -R gpio /sys%p && chmod -R g=u /sys%p'"
 
-          # PWM export results in a "change" action on the pwmchip device (not "add" of a new device), so match actions other than "remove".
-          SUBSYSTEM=="pwm", ACTION!="remove", PROGRAM="${shell} -c 'chgrp -R gpio /sys%p && chmod -R g=u /sys%p'"
+    #       # PWM export results in a "change" action on the pwmchip device (not "add" of a new device), so match actions other than "remove".
+    #       SUBSYSTEM=="pwm", ACTION!="remove", PROGRAM="${shell} -c 'chgrp -R gpio /sys%p && chmod -R g=u /sys%p'"
 
-          KERNEL=="ttyAMA[0-9]*|ttyS[0-9]*", PROGRAM="${shell} -c '\
-                  ALIASES=/proc/device-tree/aliases; \
-                  TTYNODE=$$(readlink /sys/class/tty/%k/device/of_node | sed 's/base/:/' | cut -d: -f2); \
-                  if [ -e $$ALIASES/bluetooth ] && [ $$TTYNODE/bluetooth = $$(strings $$ALIASES/bluetooth) ]; then \
-                      echo 1; \
-                  elif [ -e $$ALIASES/console ]; then \
-                      if [ $$TTYNODE = $$(strings $$ALIASES/console) ]; then \
-                          echo 0;\
-                      else \
-                          exit 1; \
-                      fi \
-                  elif [ $$TTYNODE = $$(strings $$ALIASES/serial0) ]; then \
-                      echo 0; \
-                  elif [ $$TTYNODE = $$(strings $$ALIASES/serial1) ]; then \
-                      echo 1; \
-                  else \
-                      exit 1; \
-                  fi \
-          '", SYMLINK+="serial%c"
+    #       KERNEL=="ttyAMA[0-9]*|ttyS[0-9]*", PROGRAM="${shell} -c '\
+    #               ALIASES=/proc/device-tree/aliases; \
+    #               TTYNODE=$$(readlink /sys/class/tty/%k/device/of_node | sed 's/base/:/' | cut -d: -f2); \
+    #               if [ -e $$ALIASES/bluetooth ] && [ $$TTYNODE/bluetooth = $$(strings $$ALIASES/bluetooth) ]; then \
+    #                   echo 1; \
+    #               elif [ -e $$ALIASES/console ]; then \
+    #                   if [ $$TTYNODE = $$(strings $$ALIASES/console) ]; then \
+    #                       echo 0;\
+    #                   else \
+    #                       exit 1; \
+    #                   fi \
+    #               elif [ $$TTYNODE = $$(strings $$ALIASES/serial0) ]; then \
+    #                   echo 0; \
+    #               elif [ $$TTYNODE = $$(strings $$ALIASES/serial1) ]; then \
+    #                   echo 1; \
+    #               else \
+    #                   exit 1; \
+    #               fi \
+    #       '", SYMLINK+="serial%c"
 
-          ACTION=="add", SUBSYSTEM=="vtconsole", KERNEL=="vtcon1", RUN+="${shell} -c '\
-          	if echo RPi-Sense FB | cmp -s /sys/class/graphics/fb0/name; then \
-          		echo 0 > /sys$devpath/bind; \
-          	fi; \
-          '"
-        ''
-        else '''';
-    };
+    #       ACTION=="add", SUBSYSTEM=="vtconsole", KERNEL=="vtcon1", RUN+="${shell} -c '\
+    #       	if echo RPi-Sense FB | cmp -s /sys/class/graphics/fb0/name; then \
+    #       		echo 0 > /sys$devpath/bind; \
+    #       	fi; \
+    #       '"
+    #     ''
+    #     else '''';
+    # };
   };
 
 }

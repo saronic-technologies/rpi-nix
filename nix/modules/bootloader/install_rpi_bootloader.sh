@@ -22,7 +22,7 @@ BOOT_DIRECTORY=/boot/firmware
 STAGING_DIRECTORY=$(mktemp -d)
 
 INIT_STAGING="$STAGING_DIRECTORY/init.tmp"
-BOOTLOADER_STAGING_DIRECTORY="$STAGING_DIRECTORY/bootloader";
+BOOTLOADER_STAGING_DIRECTORY="$STAGING_DIRECTORY/firmware";
 
 OTHER_PATHS_FILENAME="other_configurations.txt"
 OTHER_PATHS_STAGING="$BOOTLOADER_STAGING_DIRECTORY/$OTHER_PATHS_FILENAME"
@@ -87,9 +87,14 @@ addEntry() {
 # of storing them on the toplevel explicitly.
 
 copyBootloaderFiles() {
-@BOOTLOADER_COPY_COMMANDS_START@
-@BOOTLOADER_COPY_COMMANDS@
-@BOOTLOADER_COPY_COMMANDS_END@
+  local previousDirectory = $(pwd)
+  # CD into our staging directory, as our copy commands assume that there is a directory
+  # called "firmware" that it can copy to
+  cd "$STAGING_DIRECTORY"
+  @BOOTLOADER_COPY_COMMANDS_START@
+  @BOOTLOADER_COPY_COMMANDS@
+  @BOOTLOADER_COPY_COMMANDS_END@
+  cd "$previousDirectory"
 }
 
 # Make our bootloader staging area
