@@ -135,11 +135,7 @@ in
             "pcie_brcmstb" # required for the pcie bus to work
             "reset-raspberrypi" # required for vl805 firmware to load
           ];
-        } else { includeDefaultModules = false; availableKernelModules = []; kernelModules = []; };
-      };
-
-      hardware = {
-        enableRedistributableFirmware = false;
+        } else lib.mkForce { includeDefaultModules = false; availableKernelModules = []; kernelModules = []; };
       };
 
       # If we are using the RPI bootloader, then modify our installBootLoader script to our
