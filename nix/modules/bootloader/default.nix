@@ -127,7 +127,6 @@ in
           };
         };
         consoleLogLevel = lib.mkDefault 7;
-        enableAllHardware = false;
         initrd = if config.boot.loader.rpi.enable && config.boot.loader.rpi.useRamdisk then {
           availableKernelModules = [
             "usbhid"
@@ -137,6 +136,10 @@ in
             "reset-raspberrypi" # required for vl805 firmware to load
           ];
         } else { includeDefaultModules = false; availableKernelModules = []; kernelModules = []; };
+      };
+
+      hardware = {
+        enableRedistributableFirmware = false;
       };
 
       # If we are using the RPI bootloader, then modify our installBootLoader script to our
