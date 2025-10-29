@@ -127,17 +127,16 @@ in
           };
         };
         consoleLogLevel = lib.mkDefault 7;
+        initrd = if config.boot.loader.rpi.enable && config.boot.loader.rpi.useRamdisk then {
+          availableKernelModules = [
+            "usbhid"
+            "usb_storage"
+            "vc4"
+            "pcie_brcmstb" # required for the pcie bus to work
+            "reset-raspberrypi" # required for vl805 firmware to load
+          ];
+        } else { includeDefaultModules = false; availableKernelModules = []; kernelModules = []; };
       };
-
-      initrd = if config.boot.loader.rpi.enable && config.boot.loader.rpi.useRamdisk then {
-        availableKernelModules = [
-          "usbhid"
-          "usb_storage"
-          "vc4"
-          "pcie_brcmstb" # required for the pcie bus to work
-          "reset-raspberrypi" # required for vl805 firmware to load
-        ];
-      } else { includeDefaultModules = false; availableKernelModules = []; kernelModules = []; };
 
       # If we are using the RPI bootloader, then modify our installBootLoader script to our
       # custom one
