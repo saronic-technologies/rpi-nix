@@ -32,7 +32,7 @@ in
       compressImage = true;
       rootVolumeLabel = "NIXOS_SD";
       # Concatenate our kernel copy and our firmware copy commands as our firmware commands
-      populateImageCommands =
+      populateRootCommands =
         if config.boot.loader.rpi-uboot.enable
         then ''
           mkdir -p ./files/boot

@@ -143,7 +143,7 @@ in
               "@BOOTLOADER_COPY_COMMANDS_END@"
             ]
             [
-              bootPartitionHelpers.mkPopulateRPIBootPartitionCommands { inherit config pkgs; }
+              (bootPartitionHelpers.mkPopulateRPIBootPartitionCommands { inherit config pkgs; })
               # Use our NixOS distro name
               config.system.nixos.distroName
               "### BOOTLOADER COPY COMMANDS START ###"
