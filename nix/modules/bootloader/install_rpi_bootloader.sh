@@ -87,7 +87,7 @@ addEntry() {
 # of storing them on the toplevel explicitly.
 
 copyBootloaderFiles() {
-  local previousDirectory = $(pwd)
+  local previousDirectory=$(pwd)
   # CD into our staging directory, as our copy commands assume that there is a directory
   # called "firmware" that it can copy to
   cd "$STAGING_DIRECTORY"
