@@ -30,7 +30,7 @@ in
     sdImage = {
       populateFirmwareCommands = bootPartitionHelpers.mkPopulateRPIBootPartitionCommands { inherit config pkgs; };
       compressImage = true;
-      rootVolumeLabel = "NIXOS_SD";
+      # rootVolumeLabel = "NIXOS_SD";
       # Concatenate our kernel copy and our firmware copy commands as our firmware commands
       populateRootCommands =
         if config.boot.loader.rpi-uboot.enable
