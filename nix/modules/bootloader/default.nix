@@ -127,6 +127,7 @@ in
           };
         };
         consoleLogLevel = lib.mkDefault 7;
+        enableAllHardware = false;
         initrd = if config.boot.loader.rpi.enable && config.boot.loader.rpi.useRamdisk then {
           availableKernelModules = [
             "usbhid"
