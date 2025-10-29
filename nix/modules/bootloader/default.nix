@@ -74,15 +74,13 @@ in
 
         # Nix is buggy when we use initrd.enable = false; lots of code assumes it has to be there,
         # including uboot, so with our custom bootloader we can fix this a bit.
-        useRamdisk = {
-          enable = mkOption {
-            default = true;
-            type = types.bool;
-            description = ''
-              whether we want to use a ramdisk.  if we compile all our modules straight into
-              our kernel, we don't require it.
-            '';
-          };
+        useRamdisk = mkOption {
+          default = true;
+          type = types.bool;
+          description = ''
+            whether we want to use a ramdisk.  if we compile all our modules straight into
+            our kernel, we don't require it.
+          '';
         };
       };
 
