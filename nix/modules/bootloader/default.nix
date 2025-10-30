@@ -138,6 +138,12 @@ in
         } else lib.mkForce { includeDefaultModules = false; availableKernelModules = []; kernelModules = []; };
       };
 
+      # For some reason, nixpkgs upstream includes "noauto", which won't work
+      # for our RPI bootloader, as it needs /boot to be mounted by default.
+      fileSystems."/boot/firmware" = lib.mkIf config.boot.loader.rpi.enable {
+        options = lib.mkForce ["nofail"];
+      };
+
       # If we are using the RPI bootloader, then modify our installBootLoader script to our
       # custom one
       system.build.installBootLoader = mkIf config.boot.loader.rpi.enable (
