@@ -24,7 +24,7 @@ let
     '';
   };
   bootPartitionHelpers = import ../../lib/populate_boot_partition.nix inputs;
-in 
+in
   with lib;
   {
     options = {
@@ -45,7 +45,7 @@ in
           };
 
           kernelFilename = mkOption {
-            type = types.string;
+            type = types.str;
             default = "kernel.img";
             description = ''
               Filename of the kernel image in the boot partition.
@@ -61,13 +61,13 @@ in
           default = false;
           type = types.bool;
           description = ''
-            Raspberry PI bootloader installer that overwrites the /boot/firmware directory 
+            Raspberry PI bootloader installer that overwrites the /boot/firmware directory
             with every "boot" switch.
           '';
         };
 
         ramdiskFilename = mkOption {
-          type = types.string;
+          type = types.str;
           default = "initrd";
           description = "Filename of the initrd in the boot partition.";
         };
@@ -171,7 +171,7 @@ in
             text = script_content;
             runtimeInputs = [ pkgs.openssh pkgs.gawk ];
           };
-        in 
+        in
           "${installRPIBootloader}/bin/install-rpi-bootloader"
       );
 
